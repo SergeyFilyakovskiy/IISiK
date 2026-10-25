@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/booking-service/src ./services/booking-service/src
+COPY services/booking-service/alembic.ini ./services/booking-service/alembic.ini
 COPY services/booking-service/migrations ./services/booking-service/migrations
 
 # ============================================================

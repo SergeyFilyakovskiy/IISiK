@@ -34,7 +34,9 @@ services:
 
   # ── GRAPHQL API GATEWAY (BFF) ──────────────────────────────
   graphql-api:
-    build: ./services/graphql-api
+    build:
+      context: .
+      dockerfile: services/graphql-api/Dockerfile
     restart: no
     environment:
       - IDENTITY_SERVICE_HOST=identity-service
@@ -78,8 +80,12 @@ services:
   # ── BACKEND MICROSERVICES (gRPC) ───────────────────────────
 
   identity-service:
-    build: ./services/identity-service
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/identity_db
     expose:
       - "50051" # gRPC port
       - "8000"  # HTTP port (healthchecks/metrics)
@@ -90,8 +96,12 @@ services:
       - internal
 
   catalog-service:
-    build: ./services/catalog-service
+    build:
+      context: .
+      dockerfile: services/catalog-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
     expose:
       - "50051"
       - "8000"
@@ -102,8 +112,12 @@ services:
       - internal
 
   scheduling-service:
-    build: ./services/scheduling-service
+    build:
+      context: .
+      dockerfile: services/scheduling-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/scheduling_db
     expose:
       - "50051"
       - "8000"
@@ -114,8 +128,12 @@ services:
       - internal
 
   booking-service:
-    build: ./services/booking-service
+    build:
+      context: .
+      dockerfile: services/booking-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
     expose:
       - "50051"
       - "8000"
@@ -126,8 +144,12 @@ services:
       - internal
 
   payment-service:
-    build: ./services/payment-service
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db
     expose:
       - "50051"
       - "8000"
@@ -138,8 +160,12 @@ services:
       - internal
 
   review-service:
-    build: ./services/review-service
+    build:
+      context: .
+      dockerfile: services/review-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/review_db
     expose:
       - "50051"
       - "8000"
@@ -150,19 +176,28 @@ services:
       - internal
 
   notification-service:
-    build: ./services/notification-service
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db
     expose:
       - "8000"
     depends_on:
+      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       kafka: { condition: service_started }
     networks:
       - internal
 
   analytics-service:
-    build: ./services/analytics-service
+    build:
+      context: .
+      dockerfile: services/analytics-service/Dockerfile
     restart: no
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/analytics_db
     expose:
       - "50051"
       - "8000"

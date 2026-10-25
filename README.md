@@ -370,7 +370,7 @@ docker compose down -v     # остановить и удалить данные
 
 | Переменная | Описание | Пример |
 |---|---|---|
-| `DATABASE_URL` | URL БД | `postgresql://...@postgres:5432/identity_db` |
+| `DATABASE_URL` | URL БД | `postgresql+asyncpg://...@postgres:5432/identity_db` |
 | `REDIS_URL` | URL Redis | `redis://:password@redis:6379/0` |
 | `JWT_EXPIRE_MINUTES` | Время жизни токена | `60` |
 
@@ -378,7 +378,7 @@ docker compose down -v     # остановить и удалить данные
 
 | Переменная | Описание | Пример |
 |---|---|---|
-| `DATABASE_URL` | URL БД сервиса | `postgresql://...@postgres:5432/booking_db` |
+| `DATABASE_URL` | URL БД сервиса | `postgresql+asyncpg://...@postgres:5432/booking_db` |
 | `KAFKA_BROKERS` | Адреса Kafka | `kafka:9092` |
 | `GRPC_PORT` | Порт gRPC | `50054` |
 | `HTTP_PORT` | Порт HTTP/health | `8004` |
@@ -440,7 +440,7 @@ docker compose up -d booking-service
 docker compose exec booking-service bash
 
 # выполнить миграции вручную
-docker compose exec booking-service uv run --package booking-service alembic upgrade head
+docker compose exec booking-service uv run --package booking-service alembic -c services/booking-service/alembic.ini upgrade head
 
 # посмотреть события Kafka
 docker compose exec kafka kafka-console-consumer.sh \
@@ -654,7 +654,7 @@ docker network inspect tutoring-platform_internal
 docker compose exec postgres psql -U postgres -c "\l"
 
 # применить миграции вручную
-docker compose exec booking-service uv run --package booking-service alembic upgrade head
+docker compose exec booking-service uv run --package booking-service alembic -c services/booking-service/alembic.ini upgrade head
 ```
 
 ### Kafka не подключается

@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/analytics-service/src ./services/analytics-service/src
+COPY services/analytics-service/alembic.ini ./services/analytics-service/alembic.ini
 COPY services/analytics-service/migrations ./services/analytics-service/migrations
 
 # ============================================================

@@ -19,7 +19,7 @@ run_migrations() {
     fi
 
     echo "Running Alembic migrations..."
-    uv run --package notification-service alembic upgrade head
+    uv run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head
     echo "Migrations applied successfully"
 }
 

@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/identity-service/src ./services/identity-service/src
+COPY services/identity-service/alembic.ini ./services/identity-service/alembic.ini
 COPY services/identity-service/migrations ./services/identity-service/migrations
 
 # ============================================================

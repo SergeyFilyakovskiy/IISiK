@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/payment-service/src ./services/payment-service/src
+COPY services/payment-service/alembic.ini ./services/payment-service/alembic.ini
 COPY services/payment-service/migrations ./services/payment-service/migrations
 
 # ============================================================

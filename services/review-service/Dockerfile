@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/review-service/src ./services/review-service/src
+COPY services/review-service/alembic.ini ./services/review-service/alembic.ini
 COPY services/review-service/migrations ./services/review-service/migrations
 
 # ============================================================

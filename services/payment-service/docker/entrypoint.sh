@@ -19,7 +19,7 @@ run_migrations() {
     fi
 
     echo "Running Alembic migrations..."
-    uv run --package booking-service alembic upgrade head
+    uv run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head
     echo "Migrations applied successfully"
 }
 

@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/scheduling-service/src ./services/scheduling-service/src
+COPY services/scheduling-service/alembic.ini ./services/scheduling-service/alembic.ini
 COPY services/scheduling-service/migrations ./services/scheduling-service/migrations
 
 # ============================================================

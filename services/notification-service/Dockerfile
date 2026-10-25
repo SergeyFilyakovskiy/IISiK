@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/notification-service/src ./services/notification-service/src
+COPY services/notification-service/alembic.ini ./services/notification-service/alembic.ini
 COPY services/notification-service/migrations ./services/notification-service/migrations
 
 # ============================================================

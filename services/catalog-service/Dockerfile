@@ -24,6 +24,7 @@ RUN uv sync \
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/catalog-service/src ./services/catalog-service/src
+COPY services/catalog-service/alembic.ini ./services/catalog-service/alembic.ini
 COPY services/catalog-service/migrations ./services/catalog-service/migrations
 
 # ============================================================
