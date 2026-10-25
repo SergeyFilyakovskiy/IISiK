@@ -17,8 +17,8 @@ volumes:
 services:
   # ── API GATEWAY (EDGE) ─────────────────────────────────────
   traefik:
-    image: traefik:v3.0
-    restart: unless-stopped
+    image: traefik:latest
+    restart: no
     ports:
       - "80:80"
       - "443:443"
@@ -35,27 +35,51 @@ services:
   # ── GRAPHQL API GATEWAY (BFF) ──────────────────────────────
   graphql-api:
     build: ./services/graphql-api
-    restart: unless-stopped
-    env_file: .env
+    restart: no
+    environment:
+      - IDENTITY_SERVICE_HOST=identity-service
+      - IDENTITY_SERVICE_PORT=50051
+      - CATALOG_SERVICE_HOST=catalog-service
+      - CATALOG_SERVICE_PORT=50051
+      - SCHEDULING_SERVICE_HOST=scheduling-service
+      - SCHEDULING_SERVICE_PORT=50051
+      - BOOKING_SERVICE_HOST=booking-service
+      - BOOKING_SERVICE_PORT=50051
+      - PAYMENT_SERVICE_HOST=payment-service
+      - PAYMENT_SERVICE_PORT=50051
+      - REVIEW_SERVICE_HOST=review-service
+      - REVIEW_SERVICE_PORT=50051
+      - ANALYTICS_SERVICE_HOST=analytics-service
+      - ANALYTICS_SERVICE_PORT=50051
+    expose:
+      - "4000"
     depends_on:
-      redis: { condition: service_healthy }
+      identity-service: { condition: service_started }
+      catalog-service: { condition: service_started }
+      scheduling-service: { condition: service_started }
+      booking-service: { condition: service_started }
+      payment-service: { condition: service_started }
+      review-service: { condition: service_started }
     networks:
-      - public
       - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=tutoring-platform_public"
-      # Весь GraphQL трафик идёт сюда
+      - "traefik.docker.network=tutoring-platform_internal"
       - "traefik.http.routers.graphql.rule=Host(`api.localhost`) && PathPrefix(`/graphql`)"
-      - "traefik.http.routers.graphql.middlewares=rate-limit@file,cors-headers@file"
+      - "traefik.http.routers.graphql.middlewares=cors-headers@file"
       - "traefik.http.services.graphql.loadbalancer.server.port=4000"
 
   # ── BACKEND MICROSERVICES (gRPC) ───────────────────────────
-  
+
   identity-service:
     build: ./services/identity-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051" # gRPC port
       - "8000"  # HTTP port (healthchecks/metrics)
@@ -67,8 +91,7 @@ services:
 
   catalog-service:
     build: ./services/catalog-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -80,8 +103,7 @@ services:
 
   scheduling-service:
     build: ./services/scheduling-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -93,8 +115,7 @@ services:
 
   booking-service:
     build: ./services/booking-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -106,8 +127,7 @@ services:
 
   payment-service:
     build: ./services/payment-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -119,8 +139,7 @@ services:
 
   review-service:
     build: ./services/review-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -132,8 +151,7 @@ services:
 
   notification-service:
     build: ./services/notification-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "8000"
     depends_on:
@@ -144,8 +162,7 @@ services:
 
   analytics-service:
     build: ./services/analytics-service
-    restart: unless-stopped
-    env_file: .env
+    restart: no
     expose:
       - "50051"
       - "8000"
@@ -156,10 +173,10 @@ services:
       - internal
 
   # ── DATABASES & BROKERS ────────────────────────────────────
-  
+
   postgres:
     image: postgres:16-alpine
-    restart: unless-stopped
+    restart: no
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -188,7 +205,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: >
-      redis-server 
+      redis-server
       --requirepass ${REDIS_PASSWORD}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
@@ -205,7 +222,7 @@ services:
 
   kafka:
     image: bitnami/kafka:3.6
-    restart: unless-stopped
+    restart: no
     environment:
       - KAFKA_ENABLE_KRAFT=yes
       - KAFKA_CFG_PROCESS_ROLES=broker,controller
@@ -227,10 +244,10 @@ services:
       retries: 5
 
   # ── UI & OBSERVABILITY ─────────────────────────────────────
-  
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    restart: unless-stopped
+    restart: no
     environment:
       - DYNAMIC_CONFIG_ENABLED=true
     depends_on:
@@ -245,7 +262,7 @@ services:
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
-    restart: unless-stopped
+    restart: no
     environment:
       REDIS_ADDR: redis://redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -256,7 +273,7 @@ services:
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
-    restart: unless-stopped
+    restart: no
     environment:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres?sslmode=disable"
     networks:
@@ -266,7 +283,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    restart: unless-stopped
+    restart: no
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -281,7 +298,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    restart: unless-stopped
+    restart: no
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_SERVER_ROOT_URL=http://grafana.localhost
