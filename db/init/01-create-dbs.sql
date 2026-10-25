@@ -1,0 +1,17 @@
+CREATE DATABASE identity_db;
+CREATE DATABASE catalog_db;
+CREATE DATABASE scheduling_db;
+CREATE DATABASE booking_db;
+CREATE DATABASE payment_db;
+CREATE DATABASE review_db;
+CREATE DATABASE notification_db;
+CREATE DATABASE analytics_db;
+
+GRANT ALL PRIVILEGES ON DATABASE identity_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE catalog_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE scheduling_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE booking_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE payment_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE review_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE notification_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE analytics_db TO postgres;

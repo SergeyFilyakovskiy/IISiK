@@ -1,0 +1,45 @@
+line-length = 100
+target-version = "py313"
+
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "*/migrations/*",
+    "*/generated/*",
+    "proto",
+]
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
+
+ignore = []
+
+[lint.per-file-ignores]
+"__init__.py" = [
+    "F401",
+]
+
+[lint.isort]
+known-first-party = [
+    "shared",
+    "identity_service",
+    "catalog_service",
+    "scheduling_service",
+    "booking_service",
+    "payment_service",
+    "review_service",
+    "notification_service",
+    "analytics_service",
+    "graphql_api",
+]

@@ -1,0 +1,8 @@
+version: v2
+
+plugins:
+  - local: protoc-gen-python
+    out: packages/proto-generated/src
+
+  - local: protoc-gen-python_grpc
+    out: packages/proto-generated/src
