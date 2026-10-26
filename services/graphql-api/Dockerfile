@@ -23,6 +23,14 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY services/identity-service/src ./services/identity-service/src
+COPY services/catalog-service/src ./services/catalog-service/src
+COPY services/scheduling-service/src ./services/scheduling-service/src
+COPY services/booking-service/src ./services/booking-service/src
+COPY services/payment-service/src ./services/payment-service/src
+COPY services/review-service/src ./services/review-service/src
+COPY services/notification-service/src ./services/notification-service/src
+COPY services/analytics-service/src ./services/analytics-service/src
 COPY services/graphql-api/src ./services/graphql-api/src
 
 # ============================================================
@@ -42,10 +50,11 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/pyproject.toml /app/
 COPY --from=builder /app/uv.lock /app/
 COPY --from=builder /app/packages /app/packages
-COPY --from=builder /app/services/graphql-api /app/services/graphql-api
+COPY --from=builder /app/services /app/services
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/graphql-api/src:/app/services/identity-service/src:/app/services/catalog-service/src:/app/services/scheduling-service/src:/app/services/booking-service/src:/app/services/payment-service/src:/app/services/review-service/src:/app/services/notification-service/src:/app/services/analytics-service/src:/app/packages/shared/src" \
     PYTHONUNBUFFERED=1
 
 EXPOSE 4000
