@@ -314,9 +314,10 @@ KAFKA_BROKERS=kafka:9092
 GRAFANA_ADMIN_PASSWORD=admin
 
 # JWT
-JWT_SECRET=change_me_in_production
+JWT_SECRET=change_me_to_a_random_secret_at_least_32_characters
 JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=60
+JWT_ACCESS_TTL_MINUTES=5
+JWT_REFRESH_TTL_DAYS=30
 ```
 
 ### 3. Запуск всей инфраструктуры
@@ -372,7 +373,11 @@ docker compose down -v     # остановить и удалить данные
 |---|---|---|
 | `DATABASE_URL` | URL БД | `postgresql+asyncpg://...@postgres:5432/identity_db` |
 | `REDIS_URL` | URL Redis | `redis://:password@redis:6379/0` |
-| `JWT_EXPIRE_MINUTES` | Время жизни токена | `60` |
+| `JWT_SECRET` | Секрет подписи JWT, минимум 32 символа | случайная строка |
+| `JWT_ALGORITHM` | Алгоритм подписи | `HS256` |
+| `JWT_ACCESS_TTL_MINUTES` | Время жизни access-токена | `5` |
+| `JWT_REFRESH_TTL_DAYS` | Время жизни refresh-токена | `30` |
+| `GRPC_PORT` | Порт gRPC | `50051` |
 
 ### Остальные сервисы
 
@@ -382,6 +387,25 @@ docker compose down -v     # остановить и удалить данные
 | `KAFKA_BROKERS` | Адреса Kafka | `kafka:9092` |
 | `GRPC_PORT` | Порт gRPC | `50054` |
 | `HTTP_PORT` | Порт HTTP/health | `8004` |
+
+### Identity Service API
+
+Identity Service уже предоставляет HTTP API на порту `8001` и gRPC API на порту `50051`:
+
+- `POST /api/v1/auth/register` — регистрация STUDENT или TEACHER;
+- `POST /api/v1/auth/login` — вход и выдача пары токенов;
+- `POST /api/v1/auth/refresh` — выдача новой пары с одноразовой ротацией refresh;
+- `POST /api/v1/auth/logout` — отзыв access через blacklist и удаление refresh;
+- `GET /api/v1/users/me` — текущий пользователь по Bearer access;
+- `GET /health` — проверка PostgreSQL и Redis.
+
+Access JWT действует 5 минут. Refresh JWT хранится в Redis 30 дней и заменяется при каждом refresh, поэтому старый refresh нельзя использовать повторно. Logout помещает `jti` access в Redis blacklist на оставшийся срок жизни. gRPC-контракт `identity.v1.IdentityService` содержит операции Register, Login, Refresh, Logout, GetUser и ValidateToken; защищённые вызовы используют metadata `authorization: Bearer <access>`.
+
+### GraphQL API для чтения
+
+GraphQL API доступен на `POST /graphql` (порт `4000`) и реализует Query для получения пользователей, профилей преподавателей, предметов, расписания, занятий, записей, платежей, отзывов, уведомлений и аналитики. Поддерживаются получение по ID, списки, фильтры, пагинация и связанные данные (`TeacherProfile → User`, `Lesson → Teacher/Subject`, `Booking → Lesson/Payment`).
+
+По требованиям ЛР3 GraphQL использует mock-шлюзы вместо сетевых gRPC-вызовов. Шлюзы обращаются только к публичным application services соответствующих доменов; каждый service/repository-слой работает исключительно со своей БД. Для проверки добавлены согласованные seed-миграции во все восемь БД. Kafka и write-Mutation в этот этап не входят.
 
 ---
 
@@ -393,6 +417,7 @@ docker compose down -v     # остановить и удалить данные
 make help              # список всех команд
 make install           # установка зависимостей + хуков
 make sync              # синхронизация зависимостей
+make generate-proto    # генерация Python/gRPC из Protobuf
 make lint              # проверка кода (pre-commit)
 make format            # форматирование кода
 make test              # запуск тестов
@@ -418,7 +443,8 @@ uv sync --all-packages
 
 ```bash
 # каждый сервис в отдельном терминале
-uv run --package identity-service uvicorn identity_service.main:app --reload --port 8001
+PYTHONPATH=services/identity-service/src:packages/shared/src:packages/proto-generated/src \
+  uv run --package identity-service uvicorn identity_service.main:app --reload --port 8001
 uv run --package catalog-service uvicorn catalog_service.main:app --reload --port 8002
 uv run --package scheduling-service uvicorn scheduling_service.main:app --reload --port 8003
 uv run --package booking-service uvicorn booking_service.main:app --reload --port 8004

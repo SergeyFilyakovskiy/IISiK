@@ -39,29 +39,18 @@ services:
       dockerfile: services/graphql-api/Dockerfile
     restart: no
     environment:
-      - IDENTITY_SERVICE_HOST=identity-service
-      - IDENTITY_SERVICE_PORT=50051
-      - CATALOG_SERVICE_HOST=catalog-service
-      - CATALOG_SERVICE_PORT=50051
-      - SCHEDULING_SERVICE_HOST=scheduling-service
-      - SCHEDULING_SERVICE_PORT=50051
-      - BOOKING_SERVICE_HOST=booking-service
-      - BOOKING_SERVICE_PORT=50051
-      - PAYMENT_SERVICE_HOST=payment-service
-      - PAYMENT_SERVICE_PORT=50051
-      - REVIEW_SERVICE_HOST=review-service
-      - REVIEW_SERVICE_PORT=50051
-      - ANALYTICS_SERVICE_HOST=analytics-service
-      - ANALYTICS_SERVICE_PORT=50051
+      - IDENTITY_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/identity_db
+      - CATALOG_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
+      - SCHEDULING_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/scheduling_db
+      - BOOKING_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
+      - PAYMENT_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db
+      - REVIEW_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/review_db
+      - NOTIFICATION_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db
+      - ANALYTICS_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/analytics_db
     expose:
       - "4000"
     depends_on:
-      identity-service: { condition: service_started }
-      catalog-service: { condition: service_started }
-      scheduling-service: { condition: service_started }
-      booking-service: { condition: service_started }
-      payment-service: { condition: service_started }
-      review-service: { condition: service_started }
+      postgres: { condition: service_healthy }
     networks:
       - internal
     healthcheck:
@@ -86,14 +75,25 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/identity_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TTL_MINUTES=5
+      - JWT_REFRESH_TTL_DAYS=30
     expose:
       - "50051" # gRPC port
-      - "8000"  # HTTP port (healthchecks/metrics)
+      - "8001"  # HTTP port (healthchecks/metrics)
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   catalog-service:
     build:
