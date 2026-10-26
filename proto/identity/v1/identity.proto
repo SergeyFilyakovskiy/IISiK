@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package identity.v1;
+
+service IdentityService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc Refresh(RefreshRequest) returns (AuthResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc ValidateToken(ValidateTokenRequest) returns (User);
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  STUDENT = 1;
+  TEACHER = 2;
+  ADMIN = 3;
+}
+
+message StudentProfileInput {
+  optional string education_level = 1;
+  optional string learning_goal = 2;
+  optional string timezone = 3;
+}
+
+message StudentProfile {
+  string id = 1;
+  optional string education_level = 2;
+  optional string learning_goal = 3;
+  optional string timezone = 4;
+  string status = 5;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string full_name = 3;
+  Role role = 4;
+  string status = 5;
+  optional StudentProfile student = 6;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+  Role role = 4;
+  optional StudentProfileInput student_profile = 5;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutResponse {
+  bool success = 1;
+}
+
+message GetUserRequest {}
+
+message ValidateTokenRequest {}
+
+message AuthResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  int32 expires_in = 4;
+  User user = 5;
+}
