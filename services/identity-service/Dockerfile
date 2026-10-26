@@ -9,11 +9,15 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
 COPY services/identity-service/pyproject.toml ./services/identity-service/
 
 RUN mkdir -p packages/shared/src/shared \
+    && mkdir -p packages/proto-generated/src/identity/v1 \
     && mkdir -p services/identity-service/src/identity_service \
     && touch packages/shared/src/shared/__init__.py \
+    && touch packages/proto-generated/src/identity/__init__.py \
+    && touch packages/proto-generated/src/identity/v1/__init__.py \
     && touch services/identity-service/src/identity_service/__init__.py
 
 RUN uv sync \
@@ -23,6 +27,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/identity-service/src ./services/identity-service/src
 COPY services/identity-service/alembic.ini ./services/identity-service/alembic.ini
 COPY services/identity-service/migrations ./services/identity-service/migrations
@@ -52,6 +57,7 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/identity-service/src:/app/packages/shared/src:/app/packages/proto-generated/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
