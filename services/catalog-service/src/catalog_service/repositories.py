@@ -15,15 +15,48 @@ class CatalogRepository:
 
     async def get_teacher(self, teacher_id: UUID) -> Teacher | None:
         statement = (
-            select(Teacher).where(Teacher.id == teacher_id).options(*self._teacher_load_options())
+            select(Teacher)
+            .where(Teacher.id == teacher_id)
+            .options(*self._teacher_load_options())
+            .execution_options(populate_existing=True)
         )
         return await self.session.scalar(statement)
 
     async def get_subject(self, subject_id: UUID) -> Subject | None:
         return await self.session.get(Subject, subject_id)
 
-    async def list_subjects(self) -> list[Subject]:
-        result = await self.session.scalars(select(Subject).order_by(Subject.name, Subject.id))
+    async def get_teacher_by_user_id(self, user_id: UUID) -> Teacher | None:
+        statement = select(Teacher).where(Teacher.user_id == user_id)
+        return await self.session.scalar(statement)
+
+    async def get_subject_by_name(
+        self, name: str, exclude_subject_id: UUID | None = None
+    ) -> Subject | None:
+        conditions = [Subject.name == name]
+        if exclude_subject_id is not None:
+            conditions.append(Subject.id != exclude_subject_id)
+        return await self.session.scalar(select(Subject).where(*conditions))
+
+    async def list_subjects(
+        self,
+        search: str | None = None,
+        is_active: bool | None = None,
+        sort_direction: str = "ASC",
+    ) -> list[Subject]:
+        conditions = []
+        if search:
+            conditions.append(Subject.name.ilike(f"%{search}%"))
+        if is_active is not None:
+            conditions.append(Subject.is_active == is_active)
+        sort_order = Subject.name.asc() if sort_direction == "ASC" else Subject.name.desc()
+        statement = select(Subject).where(*conditions).order_by(sort_order, Subject.id)
+        result = await self.session.scalars(statement)
+        return list(result)
+
+    async def list_subjects_by_ids(self, subject_ids: list[UUID]) -> list[Subject]:
+        if not subject_ids:
+            return []
+        result = await self.session.scalars(select(Subject).where(Subject.id.in_(subject_ids)))
         return list(result)
 
     async def list_teachers(
