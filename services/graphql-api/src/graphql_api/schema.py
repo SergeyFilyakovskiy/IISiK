@@ -10,6 +10,7 @@ from strawberry import Info
 from catalog_service.schemas import TeacherFilterDTO
 
 from .bff import BffService, BookingView, LessonView, TeacherView
+from .mutations import Mutation
 
 
 @strawberry.enum
@@ -532,4 +533,32 @@ class Query:
         )
 
 
-schema = strawberry.Schema(query=Query)
+class DomainSchema(strawberry.Schema):
+    def process_errors(self, errors, execution_context=None) -> None:
+        from identity_service.errors import ErrorCode as IdentityErrorCode
+        from identity_service.errors import IdentityError
+        from shared.errors import DomainError
+
+        identity_codes = {
+            IdentityErrorCode.EMAIL_EXISTS: "CONFLICT",
+            IdentityErrorCode.INVALID_CREDENTIALS: "UNAUTHENTICATED",
+            IdentityErrorCode.INVALID_TOKEN: "UNAUTHENTICATED",
+            IdentityErrorCode.INVALID_REGISTRATION: "VALIDATION_ERROR",
+            IdentityErrorCode.USER_NOT_FOUND: "NOT_FOUND",
+            IdentityErrorCode.USER_INACTIVE: "FORBIDDEN",
+        }
+        for error in errors:
+            original = error.original_error
+            code = None
+            if isinstance(original, DomainError):
+                code = original.code.value
+            elif isinstance(original, IdentityError):
+                code = identity_codes[original.code]
+            elif isinstance(original, ValueError):
+                code = "VALIDATION_ERROR"
+            if code:
+                error.extensions = {**(error.extensions or {}), "code": code}
+        super().process_errors(errors, execution_context)
+
+
+schema = DomainSchema(query=Query, mutation=Mutation)

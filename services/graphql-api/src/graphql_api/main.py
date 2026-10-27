@@ -3,10 +3,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from strawberry.fastapi import GraphQLRouter
 
+from identity_service.auth_service import AuthService
+from identity_service.tokens import TokenManager
 from shared.database import Database
 
 from .bff import BffService
@@ -44,9 +47,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             ("analytics", settings.analytics_database_url),
         )
     }
+    redis = Redis.from_url(settings.identity_redis_url, decode_responses=True)
+    tokens = TokenManager(settings, redis)
     app.state.databases = databases
+    app.state.redis = redis
     app.state.bff = BffService(
-        identity=MockIdentityGateway(databases["identity"]),
+        identity=MockIdentityGateway(
+            databases["identity"], AuthService(databases["identity"], tokens)
+        ),
         catalog=MockCatalogGateway(databases["catalog"]),
         scheduling=MockSchedulingGateway(databases["scheduling"]),
         booking=MockBookingGateway(databases["booking"]),
@@ -58,6 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await redis.aclose()
         await asyncio.gather(*(database.close() for database in databases.values()))
 
 

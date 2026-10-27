@@ -13,8 +13,11 @@ from catalog_service.schemas import (
     TeacherFilterDTO,
 )
 from catalog_service.service import CatalogService
+from identity_service.auth_service import AuthService
 from identity_service.read_schemas import StudentDTO, UserDTO
 from identity_service.read_service import IdentityReadService
+from identity_service.schemas import AuthResponse, LoginRequest, RefreshRequest, RegisterRequest
+from identity_service.write_service import IdentityWriteService
 from notification_service.schemas import NotificationDTO
 from notification_service.service import NotificationService
 from payment_service.schemas import PaymentDTO
@@ -30,6 +33,17 @@ from shared.database import Database
 class IdentityGateway(Protocol):
     async def get_user(self, user_id: UUID) -> UserDTO | None: ...
     async def get_student_by_user_id(self, user_id: UUID) -> StudentDTO | None: ...
+    async def register(self, data: RegisterRequest) -> AuthResponse: ...
+    async def login(self, data: LoginRequest) -> AuthResponse: ...
+    async def refresh(self, data: RefreshRequest) -> AuthResponse: ...
+    async def logout(self, access_token: str, refresh_token: str) -> None: ...
+    async def update_student_profile(
+        self,
+        user_id: UUID,
+        education_level: str | None,
+        learning_goal: str | None,
+        timezone: str | None,
+    ) -> StudentDTO: ...
 
 
 class CatalogGateway(Protocol):
@@ -81,14 +95,39 @@ class AnalyticsGateway(Protocol):
 
 
 class MockIdentityGateway:
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, auth_service: AuthService) -> None:
         self.service = IdentityReadService(database)
+        self.auth_service = auth_service
+        self.write_service = IdentityWriteService(database)
 
     async def get_user(self, user_id: UUID) -> UserDTO | None:
         return await self.service.get_user(user_id)
 
     async def get_student_by_user_id(self, user_id: UUID) -> StudentDTO | None:
         return await self.service.get_student_by_user_id(user_id)
+
+    async def register(self, data: RegisterRequest) -> AuthResponse:
+        return await self.auth_service.register(data)
+
+    async def login(self, data: LoginRequest) -> AuthResponse:
+        return await self.auth_service.login(data)
+
+    async def refresh(self, data: RefreshRequest) -> AuthResponse:
+        return await self.auth_service.refresh(data)
+
+    async def logout(self, access_token: str, refresh_token: str) -> None:
+        await self.auth_service.logout(access_token, refresh_token)
+
+    async def update_student_profile(
+        self,
+        user_id: UUID,
+        education_level: str | None,
+        learning_goal: str | None,
+        timezone: str | None,
+    ) -> StudentDTO:
+        return await self.write_service.update_student_profile(
+            user_id, education_level, learning_goal, timezone
+        )
 
 
 class MockCatalogGateway:

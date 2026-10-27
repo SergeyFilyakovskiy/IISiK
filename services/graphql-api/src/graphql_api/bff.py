@@ -6,6 +6,7 @@ from uuid import UUID
 from booking_service.schemas import BookingDTO
 from catalog_service.schemas import PageDTO, SubjectDTO, TeacherDTO, TeacherFilterDTO
 from identity_service.read_schemas import StudentDTO, UserDTO
+from identity_service.schemas import AuthResponse, LoginRequest, RefreshRequest, RegisterRequest
 from payment_service.schemas import PaymentDTO
 from scheduling_service.schemas import LessonDTO
 
@@ -61,6 +62,29 @@ class BffService:
         self.review = review
         self.notification = notification
         self.analytics = analytics
+
+    async def register(self, data: RegisterRequest) -> AuthResponse:
+        return await self.identity.register(data)
+
+    async def login(self, data: LoginRequest) -> AuthResponse:
+        return await self.identity.login(data)
+
+    async def refresh(self, data: RefreshRequest) -> AuthResponse:
+        return await self.identity.refresh(data)
+
+    async def logout(self, access_token: str, refresh_token: str) -> None:
+        await self.identity.logout(access_token, refresh_token)
+
+    async def update_student_profile(
+        self,
+        user_id: UUID,
+        education_level: str | None,
+        learning_goal: str | None,
+        timezone: str | None,
+    ) -> StudentDTO:
+        return await self.identity.update_student_profile(
+            user_id, education_level, learning_goal, timezone
+        )
 
     async def get_user(self, user_id: UUID) -> UserDTO | None:
         return await self.identity.get_user(user_id)
