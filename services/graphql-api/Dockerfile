@@ -9,6 +9,15 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
+COPY services/identity-service/pyproject.toml ./services/identity-service/
+COPY services/catalog-service/pyproject.toml ./services/catalog-service/
+COPY services/scheduling-service/pyproject.toml ./services/scheduling-service/
+COPY services/booking-service/pyproject.toml ./services/booking-service/
+COPY services/payment-service/pyproject.toml ./services/payment-service/
+COPY services/review-service/pyproject.toml ./services/review-service/
+COPY services/notification-service/pyproject.toml ./services/notification-service/
+COPY services/analytics-service/pyproject.toml ./services/analytics-service/
 COPY services/graphql-api/pyproject.toml ./services/graphql-api/
 
 RUN mkdir -p packages/shared/src/shared \
@@ -23,6 +32,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/identity-service/src ./services/identity-service/src
 COPY services/catalog-service/src ./services/catalog-service/src
 COPY services/scheduling-service/src ./services/scheduling-service/src

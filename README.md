@@ -452,7 +452,8 @@ uv run --package payment-service uvicorn payment_service.main:app --reload --por
 uv run --package review-service uvicorn review_service.main:app --reload --port 8006
 uv run --package notification-service python -m notification_service.consumer
 uv run --package analytics-service analytics-service
-uv run --package graphql-api uvicorn graphql_api.main:app --reload --port 4000
+PYTHONPATH=services/graphql-api/src:services/identity-service/src:services/catalog-service/src:services/scheduling-service/src:services/booking-service/src:services/payment-service/src:services/review-service/src:services/notification-service/src:services/analytics-service/src:packages/shared/src \
+  uv run --package graphql-api uvicorn graphql_api.main:app --reload --port 4000
 ```
 
 ### Работа с Docker

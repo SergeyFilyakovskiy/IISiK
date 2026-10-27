@@ -31,6 +31,7 @@ target-version = "py312"
 extend-exclude = [
     "*/migrations/*",
     "*/generated/*",
+    "packages/proto-generated",
     ".venv",
 ]
 

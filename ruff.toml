@@ -10,6 +10,7 @@ exclude = [
     ".ruff_cache",
     "*/migrations/*",
     "*/generated/*",
+    "packages/proto-generated",
     "proto",
 ]
 
