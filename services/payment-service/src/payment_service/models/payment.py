@@ -2,7 +2,17 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CHAR, CheckConstraint, Numeric, String, Text, Uuid, func, text
+from sqlalchemy import (
+    CHAR,
+    CheckConstraint,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
@@ -10,7 +20,10 @@ from .base import Base
 
 class Payment(Base):
     __tablename__ = "payments"
-    __table_args__ = (CheckConstraint("amount >= 0", name="chk_payments_amount"),)
+    __table_args__ = (
+        UniqueConstraint("booking_id", name="uq_payments_booking_id"),
+        CheckConstraint("amount >= 0", name="chk_payments_amount"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     booking_id: Mapped[UUID] = mapped_column(Uuid)
