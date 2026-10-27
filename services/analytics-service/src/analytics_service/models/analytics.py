@@ -2,10 +2,18 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Numeric, Uuid, func, text
+from sqlalchemy import Numeric, String, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
+
+
+class AnalyticsProcessedEvent(Base):
+    __tablename__ = "analytics_processed_events"
+
+    event_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class TeacherPeriodMetric(Base):
@@ -28,6 +36,7 @@ class PlatformPeriodMetric(Base):
     bookings_created: Mapped[int] = mapped_column(server_default=text("0"))
     revenue: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default=text("0"))
     avg_rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), server_default=text("0"))
+    reviews_count: Mapped[int] = mapped_column(server_default=text("0"))
     active_students: Mapped[int] = mapped_column(server_default=text("0"))
     active_teachers: Mapped[int] = mapped_column(server_default=text("0"))
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

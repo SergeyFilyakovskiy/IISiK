@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from shared.database import Database
+from shared.errors import DomainError, ErrorCode
 
 from .repositories import AnalyticsRepository
 from .schemas import AnalyticsReportDTO, TeacherMetricDTO
@@ -23,14 +24,49 @@ class AnalyticsService:
     def __init__(self, database: Database) -> None:
         self.repository = AnalyticsRepository(database)
 
+    async def record_booking_created(self, event_id: UUID, period_date: date) -> None:
+        await self.repository.record_booking_created(event_id, period_date)
+
+    async def record_payment(
+        self,
+        event_id: UUID,
+        teacher_id: UUID,
+        period_date: date,
+        amount: Decimal,
+    ) -> None:
+        await self.repository.record_payment(event_id, teacher_id, period_date, amount)
+
+    async def record_lesson_completed(
+        self, event_id: UUID, teacher_id: UUID, period_date: date
+    ) -> None:
+        await self.repository.record_lesson_completed(event_id, teacher_id, period_date)
+
+    async def record_review(
+        self,
+        event_id: UUID,
+        teacher_id: UUID,
+        period_date: date,
+        rating: int,
+    ) -> None:
+        if not 1 <= rating <= 5:
+            raise DomainError(ErrorCode.VALIDATION_ERROR, "rating must be between 1 and 5")
+        await self.repository.record_review(event_id, teacher_id, period_date, rating)
+
     async def get_report(self, period_from: date, period_to: date) -> AnalyticsReportDTO:
         if period_from > period_to:
-            raise ValueError("period_from must be earlier than or equal to period_to")
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "period_from must be earlier than or equal to period_to",
+            )
 
         metrics = await self.repository.list_teacher_metrics(period_from, period_to)
-        lessons_completed, bookings_created, revenue = await self.repository.get_platform_totals(
-            period_from, period_to
-        )
+        (
+            lessons_completed,
+            bookings_created,
+            revenue,
+            platform_weighted_rating,
+            platform_reviews_count,
+        ) = await self.repository.get_platform_totals(period_from, period_to)
 
         totals: dict[UUID, _TeacherTotals] = {}
         for metric in metrics:
@@ -55,10 +91,6 @@ class AnalyticsService:
             )
             for teacher in totals.values()
         ]
-        weighted_rating = sum(
-            (teacher.weighted_rating for teacher in totals.values()), Decimal("0")
-        )
-        reviews_count = sum(teacher.reviews_count for teacher in totals.values())
 
         return AnalyticsReportDTO(
             period_from=period_from,
@@ -66,7 +98,7 @@ class AnalyticsService:
             lessons_completed=lessons_completed,
             bookings_created=bookings_created,
             revenue=revenue,
-            avg_rating=self._average(weighted_rating, reviews_count),
+            avg_rating=self._average(platform_weighted_rating, platform_reviews_count),
             teachers=teachers,
         )
 

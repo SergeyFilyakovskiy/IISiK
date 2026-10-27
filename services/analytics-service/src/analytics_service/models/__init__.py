@@ -1,4 +1,9 @@
-from .analytics import PlatformPeriodMetric, TeacherPeriodMetric
+from .analytics import AnalyticsProcessedEvent, PlatformPeriodMetric, TeacherPeriodMetric
 from .base import Base
 
-__all__ = ["Base", "PlatformPeriodMetric", "TeacherPeriodMetric"]
+__all__ = [
+    "AnalyticsProcessedEvent",
+    "Base",
+    "PlatformPeriodMetric",
+    "TeacherPeriodMetric",
+]
