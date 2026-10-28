@@ -95,6 +95,9 @@ class CatalogService:
         if price_per_lesson is not None:
             self._validate_price(price_per_lesson)
         normalized_currency = self._validate_currency(currency) if currency is not None else None
+        normalized_profile_status = (
+            self._validate_profile_status(profile_status) if profile_status is not None else None
+        )
 
         async with self.database.session() as session:
             repository = CatalogRepository(session)
@@ -108,8 +111,8 @@ class CatalogService:
                     teacher.price_per_lesson = price_per_lesson
                 if normalized_currency is not None:
                     teacher.currency = normalized_currency
-                if profile_status is not None:
-                    teacher.profile_status = profile_status
+                if normalized_profile_status is not None:
+                    teacher.profile_status = normalized_profile_status
                 teacher.updated_at = func.now()
                 await session.commit()
             except Exception:
@@ -301,6 +304,16 @@ class CatalogService:
             raise ValueError("page must be greater than or equal to 1")
         if not 1 <= page_size <= 100:
             raise ValueError("page_size must be between 1 and 100")
+        if filters.min_rating is not None and (
+            not filters.min_rating.is_finite() or not 0 <= filters.min_rating <= 5
+        ):
+            raise DomainError(ErrorCode.VALIDATION_ERROR, "min_rating must be between 0 and 5")
+        if filters.max_price is not None and (
+            not filters.max_price.is_finite() or filters.max_price < 0
+        ):
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR, "max_price must be finite and non-negative"
+            )
 
         sort_by = filters.sort_by.upper()
         sort_direction = filters.sort_direction.upper()
@@ -364,6 +377,15 @@ class CatalogService:
         if len(normalized_currency) != 3:
             raise DomainError(ErrorCode.VALIDATION_ERROR, "currency must contain 3 characters")
         return normalized_currency
+
+    @staticmethod
+    def _validate_profile_status(profile_status: str) -> str:
+        normalized_status = profile_status.strip().upper()
+        if normalized_status not in {"ACTIVE", "INACTIVE"}:
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR, "profile_status must be ACTIVE or INACTIVE"
+            )
+        return normalized_status
 
     @staticmethod
     def _validate_subject_name(name: str) -> str:

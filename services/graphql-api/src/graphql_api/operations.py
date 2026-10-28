@@ -92,6 +92,12 @@ class BusinessOperations:
         return await self.get_lesson(lesson.id)
 
     async def cancel_lesson(self, lesson_id: UUID, reason: str | None):
+        booking = await self.booking.get_booking_by_lesson(lesson_id)
+        if booking is not None and booking.status != "CANCELLED":
+            raise DomainError(
+                ErrorCode.CONFLICT,
+                "Lesson with an active booking must be cancelled through the booking",
+            )
         lesson = await self.scheduling.cancel_lesson(lesson_id, reason)
         return await self.get_lesson(lesson.id)
 
@@ -177,7 +183,7 @@ class BusinessOperations:
             self.analytics.record_payment(
                 payment.id, booking.teacher_id, payment.paid_at.date(), payment.amount
             ),
-            self.notification.create_notification(
+            self._notify_student(
                 booking.student_id,
                 "PaymentCompleted",
                 "Payment completed",
@@ -199,7 +205,7 @@ class BusinessOperations:
             await self.payment.refund_payment(payment.id, reason)
         await self.scheduling.release_lesson(booking.lesson_id)
         await self._side_effects(
-            self.notification.create_notification(
+            self._notify_student(
                 booking.student_id,
                 "BookingCancelled",
                 "Booking cancelled",
@@ -216,12 +222,12 @@ class BusinessOperations:
         if booking.status != "CONFIRMED":
             raise DomainError(ErrorCode.CONFLICT, "Only a confirmed booking can be completed")
         lesson = await self.scheduling.complete_lesson(lesson_id)
-        await self.booking.complete_booking(booking.id, datetime.now().astimezone())
+        booking = await self.booking.complete_booking(booking.id, datetime.now().astimezone())
         await self._side_effects(
             self.analytics.record_lesson_completed(
                 booking.id, booking.teacher_id, booking.completed_at.date()
             ),
-            self.notification.create_notification(
+            self._notify_student(
                 booking.student_id,
                 "LessonCompleted",
                 "Lesson completed",
@@ -254,6 +260,21 @@ class BusinessOperations:
             ),
         )
         return review
+
+    async def _notify_student(
+        self,
+        student_id: UUID,
+        event_type: str,
+        title: str,
+        body: str,
+        source_event_id: UUID,
+    ):
+        student = await self.identity.get_student(student_id)
+        if student is None:
+            raise DomainError(ErrorCode.NOT_FOUND, "Student profile not found")
+        return await self.notification.create_notification(
+            student.user_id, event_type, title, body, source_event_id
+        )
 
     async def _side_effects(self, *operations) -> None:
         results = await asyncio.gather(*operations, return_exceptions=True)

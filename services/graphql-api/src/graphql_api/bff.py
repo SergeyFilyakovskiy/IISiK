@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from booking_service.schemas import BookingDTO
@@ -20,6 +21,7 @@ from .gateways import (
     ReviewGateway,
     SchedulingGateway,
 )
+from .operations import BusinessOperations
 
 
 @dataclass
@@ -42,7 +44,7 @@ class BookingView:
     payment: PaymentDTO | None
 
 
-class BffService:
+class BffService(BusinessOperations):
     def __init__(
         self,
         identity: IdentityGateway,
@@ -138,35 +140,96 @@ class BffService:
         subject_id: UUID | None,
         start_from: datetime | None,
         end_to: datetime | None,
+        min_price: Decimal | None,
+        max_price: Decimal | None,
+        sort_by: str,
+        sort_direction: str,
     ) -> list[LessonView]:
         lessons = await self.scheduling.list_available_lessons(
-            teacher_id, subject_id, start_from, end_to
+            teacher_id,
+            subject_id,
+            start_from,
+            end_to,
+            min_price,
+            max_price,
+            sort_by,
+            sort_direction,
         )
         items = await asyncio.gather(*(self.get_lesson(lesson.id) for lesson in lessons))
         return [item for item in items if item is not None]
 
-    def list_subjects(self):
-        return self.catalog.list_subjects()
+    def list_subjects(self, search: str | None, is_active: bool | None, sort_direction: str):
+        return self.catalog.list_subjects(search, is_active, sort_direction)
 
     def list_schedule(self, teacher_id: UUID):
         return self.scheduling.list_schedule(teacher_id)
 
-    async def list_bookings(self, student_id: UUID, status: str | None) -> list[BookingView]:
-        bookings = await self.booking.list_bookings(student_id, status)
+    async def list_bookings(
+        self,
+        student_id: UUID,
+        status: str | None,
+        created_from: datetime | None,
+        created_to: datetime | None,
+        min_price: Decimal | None,
+        max_price: Decimal | None,
+        sort_by: str,
+        sort_direction: str,
+    ) -> list[BookingView]:
+        bookings = await self.booking.list_bookings(
+            student_id,
+            status,
+            created_from,
+            created_to,
+            min_price,
+            max_price,
+            sort_by,
+            sort_direction,
+        )
         items = await asyncio.gather(*(self.get_booking(booking.id) for booking in bookings))
         return [item for item in items if item is not None]
 
     def get_payment(self, payment_id: UUID):
         return self.payment.get_payment(payment_id)
 
-    def list_payments(self, student_id: UUID):
-        return self.payment.list_payments(student_id)
+    def list_payments(
+        self,
+        student_id: UUID,
+        status: str | None,
+        created_from: datetime | None,
+        created_to: datetime | None,
+        min_amount: Decimal | None,
+        max_amount: Decimal | None,
+        sort_by: str,
+        sort_direction: str,
+    ):
+        return self.payment.list_payments(
+            student_id,
+            status,
+            created_from,
+            created_to,
+            min_amount,
+            max_amount,
+            sort_by,
+            sort_direction,
+        )
 
-    def list_reviews(self, teacher_id: UUID, page: int, page_size: int):
-        return self.review.list_teacher_reviews(teacher_id, page, page_size)
+    def list_reviews(
+        self,
+        teacher_id: UUID,
+        page: int,
+        page_size: int,
+        min_rating: int | None,
+        sort_by: str,
+        sort_direction: str,
+    ):
+        return self.review.list_teacher_reviews(
+            teacher_id, page, page_size, min_rating, sort_by, sort_direction
+        )
 
-    def list_notifications(self, user_id: UUID):
-        return self.notification.list_notifications(user_id)
+    def list_notifications(
+        self, user_id: UUID, status: str | None, event_type: str | None, sort_direction: str
+    ):
+        return self.notification.list_notifications(user_id, status, event_type, sort_direction)
 
     def get_analytics(self, period_from: date, period_to: date):
         return self.analytics.get_report(period_from, period_to)

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -39,6 +40,16 @@ class ReviewRepository:
                     ErrorCode.CONFLICT, "Review for this lesson and student already exists"
                 ) from error
             return self._to_dto(review)
+
+    async def get_rating_stats(self, teacher_id: UUID) -> tuple[Decimal, int]:
+        statement = select(func.avg(Review.rating), func.count(Review.id)).where(
+            Review.teacher_id == teacher_id
+        )
+        async with self.database.session() as session:
+            average_rating, reviews_count = (await session.execute(statement)).one()
+            if reviews_count == 0:
+                return Decimal("0"), 0
+            return Decimal(str(average_rating)), reviews_count
 
     async def list_teacher_reviews(
         self,

@@ -52,6 +52,13 @@ class BookingRepository:
                 return None
             return self._to_dto(booking)
 
+    async def get_booking_by_lesson(self, lesson_id: UUID) -> BookingDTO | None:
+        async with self.database.session() as session:
+            booking = await session.scalar(select(Booking).where(Booking.lesson_id == lesson_id))
+            if booking is None:
+                return None
+            return self._to_dto(booking)
+
     async def confirm_booking(self, booking_id: UUID, paid_at: datetime) -> BookingDTO:
         return await self._transition_booking(
             booking_id,

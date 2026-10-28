@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from shared.database import Database
@@ -25,6 +26,9 @@ class ReviewService:
             lesson_id, student_id, teacher_id, rating, comment
         )
 
+    async def get_rating_stats(self, teacher_id: UUID) -> tuple[Decimal, int]:
+        return await self.repository.get_rating_stats(teacher_id)
+
     async def list_teacher_reviews(
         self,
         teacher_id: UUID,
@@ -38,9 +42,22 @@ class ReviewService:
             raise ValueError("page must be greater than or equal to 1")
         if not 1 <= page_size <= 100:
             raise ValueError("page_size must be between 1 and 100")
+        if min_rating is not None and not 1 <= min_rating <= 5:
+            raise DomainError(ErrorCode.VALIDATION_ERROR, "min_rating must be between 1 and 5")
+        normalized_sort_by = sort_by.upper()
+        if normalized_sort_by not in {"CREATED_AT", "RATING", "UPDATED_AT"}:
+            raise DomainError(ErrorCode.VALIDATION_ERROR, "Unsupported review sort field")
+        normalized_sort_direction = sort_direction.upper()
+        if normalized_sort_direction not in {"ASC", "DESC"}:
+            raise DomainError(ErrorCode.VALIDATION_ERROR, "Unsupported sort direction")
 
         reviews, total_items = await self.repository.list_teacher_reviews(
-            teacher_id, page, page_size, min_rating, sort_by, sort_direction
+            teacher_id,
+            page,
+            page_size,
+            min_rating,
+            normalized_sort_by,
+            normalized_sort_direction,
         )
         return PageDTO(
             items=reviews,

@@ -31,6 +31,13 @@ class IdentityReadRepository:
                 student=self._to_student_dto(user.student),
             )
 
+    async def get_student(self, student_id: UUID) -> StudentDTO | None:
+        async with self.database.session() as session:
+            student = await session.scalar(select(Student).where(Student.id == student_id))
+            if student is None:
+                return None
+            return self._to_student_dto(student)
+
     async def get_student_by_user_id(self, user_id: UUID) -> StudentDTO | None:
         async with self.database.session() as session:
             student = await session.scalar(select(Student).where(Student.user_id == user_id))

@@ -10,7 +10,6 @@ from strawberry import Info
 from catalog_service.schemas import TeacherFilterDTO
 
 from .bff import BffService, BookingView, LessonView, TeacherView
-from .mutations import Mutation
 
 
 @strawberry.enum
@@ -57,6 +56,35 @@ class TeacherSortField(Enum):
 class SortDirection(Enum):
     ASC = "ASC"
     DESC = "DESC"
+
+
+@strawberry.enum
+class LessonSortField(Enum):
+    START_AT = "START_AT"
+    PRICE = "PRICE"
+    DURATION_MINUTES = "DURATION_MINUTES"
+    CREATED_AT = "CREATED_AT"
+
+
+@strawberry.enum
+class BookingSortField(Enum):
+    CREATED_AT = "CREATED_AT"
+    PRICE = "PRICE"
+    UPDATED_AT = "UPDATED_AT"
+
+
+@strawberry.enum
+class PaymentSortField(Enum):
+    CREATED_AT = "CREATED_AT"
+    AMOUNT = "AMOUNT"
+    UPDATED_AT = "UPDATED_AT"
+
+
+@strawberry.enum
+class ReviewSortField(Enum):
+    CREATED_AT = "CREATED_AT"
+    RATING = "RATING"
+    UPDATED_AT = "UPDATED_AT"
 
 
 @strawberry.type
@@ -281,6 +309,17 @@ def map_subject(dto) -> Subject:
     return Subject(id=dto.id, name=dto.name, description=dto.description, is_active=dto.is_active)
 
 
+def map_schedule_slot(dto) -> ScheduleSlot:
+    return ScheduleSlot(
+        id=dto.id,
+        teacher_id=dto.teacher_id,
+        weekday=dto.weekday,
+        start_time=dto.start_time,
+        end_time=dto.end_time,
+        is_active=dto.is_active,
+    )
+
+
 def map_teacher(view: TeacherView) -> TeacherProfile:
     teacher = view.teacher
     subjects = [
@@ -423,23 +462,20 @@ class Query:
         )
 
     @strawberry.field
-    async def subjects(self, info: Info) -> list[Subject]:
-        return [map_subject(item) for item in await bff(info).list_subjects()]
+    async def subjects(
+        self,
+        info: Info,
+        search: str | None = None,
+        is_active: bool | None = None,
+        sort_direction: SortDirection = SortDirection.ASC,
+    ) -> list[Subject]:
+        subjects = await bff(info).list_subjects(search, is_active, sort_direction.value)
+        return [map_subject(item) for item in subjects]
 
     @strawberry.field
     async def teacher_schedule(self, info: Info, teacher_id: UUID) -> list[ScheduleSlot]:
         slots = await bff(info).list_schedule(teacher_id)
-        return [
-            ScheduleSlot(
-                id=slot.id,
-                teacher_id=slot.teacher_id,
-                weekday=slot.weekday,
-                start_time=slot.start_time,
-                end_time=slot.end_time,
-                is_active=slot.is_active,
-            )
-            for slot in slots
-        ]
+        return [map_schedule_slot(slot) for slot in slots]
 
     @strawberry.field
     async def available_lessons(
@@ -449,8 +485,21 @@ class Query:
         subject_id: UUID | None = None,
         from_datetime: Annotated[datetime | None, strawberry.argument(name="from")] = None,
         to: datetime | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        sort_by: LessonSortField = LessonSortField.START_AT,
+        sort_direction: SortDirection = SortDirection.ASC,
     ) -> list[Lesson]:
-        lessons = await bff(info).list_available_lessons(teacher_id, subject_id, from_datetime, to)
+        lessons = await bff(info).list_available_lessons(
+            teacher_id,
+            subject_id,
+            from_datetime,
+            to,
+            Decimal(str(min_price)) if min_price is not None else None,
+            Decimal(str(max_price)) if max_price is not None else None,
+            sort_by.value,
+            sort_direction.value,
+        )
         return [map_lesson(lesson) for lesson in lessons]
 
     @strawberry.field
@@ -465,9 +514,27 @@ class Query:
 
     @strawberry.field
     async def bookings(
-        self, info: Info, student_id: UUID, status: BookingStatus | None = None
+        self,
+        info: Info,
+        student_id: UUID,
+        status: BookingStatus | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        sort_by: BookingSortField = BookingSortField.CREATED_AT,
+        sort_direction: SortDirection = SortDirection.DESC,
     ) -> list[Booking]:
-        result = await bff(info).list_bookings(student_id, status.value if status else None)
+        result = await bff(info).list_bookings(
+            student_id,
+            status.value if status else None,
+            created_from,
+            created_to,
+            Decimal(str(min_price)) if min_price is not None else None,
+            Decimal(str(max_price)) if max_price is not None else None,
+            sort_by.value,
+            sort_direction.value,
+        )
         return [map_booking(booking) for booking in result]
 
     @strawberry.field
@@ -476,25 +543,65 @@ class Query:
         return map_payment(result) if result else None
 
     @strawberry.field
-    async def payments(self, info: Info, student_id: UUID) -> list[Payment]:
-        return [map_payment(item) for item in await bff(info).list_payments(student_id)]
+    async def payments(
+        self,
+        info: Info,
+        student_id: UUID,
+        status: PaymentStatus | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        min_amount: float | None = None,
+        max_amount: float | None = None,
+        sort_by: PaymentSortField = PaymentSortField.CREATED_AT,
+        sort_direction: SortDirection = SortDirection.DESC,
+    ) -> list[Payment]:
+        payments = await bff(info).list_payments(
+            student_id,
+            status.value if status else None,
+            created_from,
+            created_to,
+            Decimal(str(min_amount)) if min_amount is not None else None,
+            Decimal(str(max_amount)) if max_amount is not None else None,
+            sort_by.value,
+            sort_direction.value,
+        )
+        return [map_payment(item) for item in payments]
 
     @strawberry.field
     async def teacher_reviews(
         self,
         info: Info,
         teacher_id: UUID,
+        min_rating: int | None = None,
+        sort_by: ReviewSortField = ReviewSortField.CREATED_AT,
+        sort_direction: SortDirection = SortDirection.DESC,
         page: PaginationInput | None = None,
     ) -> ReviewPage:
         page = page or PaginationInput()
-        result = await bff(info).list_reviews(teacher_id, page.page, page.page_size)
+        result = await bff(info).list_reviews(
+            teacher_id,
+            page.page,
+            page.page_size,
+            min_rating,
+            sort_by.value,
+            sort_direction.value,
+        )
         return ReviewPage(
             items=[map_review(item) for item in result.items], page_info=page_info(result)
         )
 
     @strawberry.field
-    async def notifications(self, info: Info, user_id: UUID) -> list[Notification]:
-        notifications = await bff(info).list_notifications(user_id)
+    async def notifications(
+        self,
+        info: Info,
+        user_id: UUID,
+        status: str | None = None,
+        event_type: str | None = None,
+        sort_direction: SortDirection = SortDirection.DESC,
+    ) -> list[Notification]:
+        notifications = await bff(info).list_notifications(
+            user_id, status, event_type, sort_direction.value
+        )
         return [
             Notification(
                 id=item.id,
@@ -560,5 +667,7 @@ class DomainSchema(strawberry.Schema):
                 error.extensions = {**(error.extensions or {}), "code": code}
         super().process_errors(errors, execution_context)
 
+
+from .mutations import Mutation  # noqa: E402
 
 schema = DomainSchema(query=Query, mutation=Mutation)

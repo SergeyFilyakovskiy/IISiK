@@ -13,5 +13,8 @@ class IdentityReadService:
     async def get_user(self, user_id: UUID) -> UserDTO | None:
         return await self.repository.get_user(user_id)
 
+    async def get_student(self, student_id: UUID) -> StudentDTO | None:
+        return await self.repository.get_student(student_id)
+
     async def get_student_by_user_id(self, user_id: UUID) -> StudentDTO | None:
         return await self.repository.get_student_by_user_id(user_id)
