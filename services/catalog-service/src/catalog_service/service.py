@@ -6,9 +6,11 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
+from shared.auth import CurrentUser, Role, require_role, require_user_owner
 from shared.database import Database
 from shared.errors import DomainError, ErrorCode
 
+from .cache import CatalogCache
 from .models import Subject, Teacher, TeacherRatingCache, TeacherSubject
 from .repositories import CatalogRepository
 from .schemas import (
@@ -22,28 +24,49 @@ from .schemas import (
 
 
 class CatalogService:
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, cache: CatalogCache | None = None) -> None:
         self.database = database
+        self.cache = cache
 
     async def get_teacher(self, teacher_id: UUID) -> TeacherDTO | None:
-        async with self.database.session() as session:
-            teacher = await CatalogRepository(session).get_teacher(teacher_id)
-            return self._to_teacher_dto(teacher) if teacher is not None else None
+        async def load():
+            async with self.database.session() as session:
+                teacher = await CatalogRepository(session).get_teacher(teacher_id)
+                return self._to_teacher_dto(teacher) if teacher is not None else None
+
+        if self.cache is not None:
+            return await self.cache.get_teacher(teacher_id, load)
+        return await load()
 
     async def get_subject(self, subject_id: UUID) -> SubjectDTO | None:
+        async def load():
+            async with self.database.session() as session:
+                subject = await CatalogRepository(session).get_subject(subject_id)
+                return self._to_subject_dto(subject) if subject is not None else None
+
+        if self.cache is not None:
+            return await self.cache.get_subject(subject_id, load)
+        return await load()
+
+    async def get_teacher_by_user_id(self, user_id: UUID) -> TeacherDTO | None:
         async with self.database.session() as session:
-            subject = await CatalogRepository(session).get_subject(subject_id)
-            return self._to_subject_dto(subject) if subject is not None else None
+            repository = CatalogRepository(session)
+            teacher = await repository.get_teacher_by_user_id(user_id)
+            if teacher is None:
+                return None
+            return self._to_teacher_dto(await self._require_teacher(repository, teacher.id))
 
     async def create_teacher_profile(
         self,
-        user_id: UUID,
+        actor: CurrentUser,
         about: str | None,
         experience_years: int,
         price_per_lesson: Decimal,
         currency: str,
         subject_ids: list[UUID],
     ) -> TeacherDTO:
+        require_role(actor, Role.TEACHER)
+        user_id = actor.user_id
         self._validate_experience(experience_years)
         self._validate_price(price_per_lesson)
         normalized_currency = self._validate_currency(currency)
@@ -84,12 +107,14 @@ class CatalogService:
     async def update_teacher_profile(
         self,
         teacher_id: UUID,
+        actor: CurrentUser,
         about: str | None = None,
         experience_years: int | None = None,
         price_per_lesson: Decimal | None = None,
         currency: str | None = None,
         profile_status: str | None = None,
     ) -> TeacherDTO:
+        require_role(actor, Role.TEACHER, admin_override=True)
         if experience_years is not None:
             self._validate_experience(experience_years)
         if price_per_lesson is not None:
@@ -103,6 +128,7 @@ class CatalogService:
             repository = CatalogRepository(session)
             try:
                 teacher = await self._require_teacher(repository, teacher_id)
+                require_user_owner(actor, teacher.user_id)
                 if about is not None:
                     teacher.about = about
                 if experience_years is not None:
@@ -127,11 +153,14 @@ class CatalogService:
         teacher_id: UUID,
         subject_id: UUID,
         proficiency_level: str | None,
+        actor: CurrentUser,
     ) -> TeacherDTO:
+        require_role(actor, Role.TEACHER, admin_override=True)
         async with self.database.session() as session:
             repository = CatalogRepository(session)
             try:
                 teacher = await self._require_teacher(repository, teacher_id)
+                require_user_owner(actor, teacher.user_id)
                 subject = await repository.get_subject(subject_id)
                 if subject is None:
                     raise DomainError(ErrorCode.NOT_FOUND, "Subject not found")
@@ -164,11 +193,15 @@ class CatalogService:
             teacher = await self._require_teacher(repository, teacher_id)
             return self._to_teacher_dto(teacher)
 
-    async def remove_teacher_subject(self, teacher_id: UUID, subject_id: UUID) -> TeacherDTO:
+    async def remove_teacher_subject(
+        self, teacher_id: UUID, subject_id: UUID, actor: CurrentUser
+    ) -> TeacherDTO:
+        require_role(actor, Role.TEACHER, admin_override=True)
         async with self.database.session() as session:
             repository = CatalogRepository(session)
             try:
                 teacher = await self._require_teacher(repository, teacher_id)
+                require_user_owner(actor, teacher.user_id)
                 link = next(
                     (link for link in teacher.subject_links if link.subject_id == subject_id),
                     None,
@@ -185,8 +218,9 @@ class CatalogService:
             return self._to_teacher_dto(teacher)
 
     async def create_subject(
-        self, name: str, description: str | None, is_active: bool = True
+        self, actor: CurrentUser, name: str, description: str | None, is_active: bool = True
     ) -> SubjectDTO:
+        require_role(actor, Role.ADMIN)
         normalized_name = self._validate_subject_name(name)
         async with self.database.session() as session:
             repository = CatalogRepository(session)
@@ -210,10 +244,12 @@ class CatalogService:
     async def update_subject(
         self,
         subject_id: UUID,
+        actor: CurrentUser,
         name: str | None = None,
         description: str | None = None,
         is_active: bool | None = None,
     ) -> SubjectDTO:
+        require_role(actor, Role.ADMIN)
         normalized_name = self._validate_subject_name(name) if name is not None else None
         async with self.database.session() as session:
             repository = CatalogRepository(session)
