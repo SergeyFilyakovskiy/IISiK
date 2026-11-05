@@ -6,7 +6,7 @@ import grpc.aio
 from catalog.v1 import catalog_pb2, catalog_pb2_grpc
 
 from shared.errors import DomainError, ErrorCode
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 
 from .schemas import TeacherFilterDTO
 from .service import CatalogService
@@ -16,7 +16,21 @@ def rpc_handler(func):
     @wraps(func)
     async def wrapper(self, request, context):
         try:
-            return await func(self, request, context)
+            result = await func(self, request, context)
+            if (
+                func.__name__
+                in {
+                    "CreateTeacherProfile",
+                    "UpdateTeacherProfile",
+                    "AddTeacherSubject",
+                    "RemoveTeacherSubject",
+                    "CreateSubject",
+                    "UpdateSubject",
+                }
+                and self.service.cache is not None
+            ):
+                await self.service.cache.invalidate()
+            return result
         except DomainError as error:
             await abort_with_domain_error(context, error)
         except ValueError as error:
@@ -24,7 +38,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def subject_to_proto(dto):

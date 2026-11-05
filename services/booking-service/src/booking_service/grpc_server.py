@@ -8,7 +8,7 @@ from booking.v1 import booking_pb2, booking_pb2_grpc
 
 from shared.errors import DomainError, ErrorCode
 from shared.events import publish_event
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 from shared.kafka import KafkaEventProducer
 
 from .workflows import BookingWorkflowService
@@ -26,7 +26,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def booking_to_proto(dto):
@@ -148,6 +148,7 @@ class BookingServicer(booking_pb2_grpc.BookingServiceServicer):
         )
         response = booking_pb2.BookingCancellation(cancelled=True)
         if booking is not None:
+            await self._publish("booking.cancelled", booking)
             response.booking.CopyFrom(booking_to_proto(booking))
         return response
 

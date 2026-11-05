@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from strawberry import asdict
 
 from shared.auth import CurrentUser, Role, require_role, require_user_owner
 from shared.database import Database
@@ -310,6 +311,8 @@ class CatalogService:
                 await session.rollback()
                 raise
 
+            if self.cache is not None:
+                await self.cache.invalidate()
             return self._to_rating_dto(rating)
 
     async def list_subjects(
@@ -322,13 +325,24 @@ class CatalogService:
         if normalized_direction not in {"ASC", "DESC"}:
             raise DomainError(ErrorCode.VALIDATION_ERROR, "sort_direction must be ASC or DESC")
         normalized_search = search.strip() if search is not None else None
-        async with self.database.session() as session:
-            subjects = await CatalogRepository(session).list_subjects(
-                search=normalized_search,
-                is_active=is_active,
-                sort_direction=normalized_direction,
-            )
-            return [self._to_subject_dto(subject) for subject in subjects]
+
+        async def load():
+            async with self.database.session() as session:
+                subjects = await CatalogRepository(session).list_subjects(
+                    search=normalized_search,
+                    is_active=is_active,
+                    sort_direction=normalized_direction,
+                )
+                return [asdict(self._to_subject_dto(subject)) for subject in subjects]
+
+        filters = {
+            "search": normalized_search,
+            "is_active": is_active,
+            "sort_direction": normalized_direction,
+        }
+        if self.cache is not None:
+            return await self.cache.list_subjects(filters, load)
+        return [SubjectDTO(**item) for item in await load()]
 
     async def list_teachers(
         self,
@@ -359,16 +373,29 @@ class CatalogService:
             raise ValueError("sort_direction must be ASC or DESC")
         normalized_filters = replace(filters, sort_by=sort_by, sort_direction=sort_direction)
 
-        async with self.database.session() as session:
-            teachers, total_items = await CatalogRepository(session).list_teachers(
-                normalized_filters, page, page_size
+        async def load():
+            async with self.database.session() as session:
+                teachers, total_items = await CatalogRepository(session).list_teachers(
+                    normalized_filters, page, page_size
+                )
+            result = PageDTO(
+                items=[self._to_teacher_dto(teacher) for teacher in teachers],
+                page=page,
+                page_size=page_size,
+                total_items=total_items,
+                total_pages=ceil(total_items / page_size),
             )
+            return asdict(result)
+
+        if self.cache is not None:
+            return await self.cache.list_teachers(normalized_filters, page, page_size, load)
+        value = await load()
         return PageDTO(
-            items=[self._to_teacher_dto(teacher) for teacher in teachers],
-            page=page,
-            page_size=page_size,
-            total_items=total_items,
-            total_pages=ceil(total_items / page_size),
+            items=value["items"],
+            page=value["page"],
+            page_size=value["page_size"],
+            total_items=value["total_items"],
+            total_pages=value["total_pages"],
         )
 
     @staticmethod
