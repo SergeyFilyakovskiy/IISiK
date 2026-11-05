@@ -8,6 +8,7 @@ class ErrorCode(StrEnum):
     INVALID_REGISTRATION = "invalid_registration"
     USER_NOT_FOUND = "user_not_found"
     USER_INACTIVE = "user_inactive"
+    SESSION_STORE_UNAVAILABLE = "session_store_unavailable"
 
 
 class IdentityError(Exception):

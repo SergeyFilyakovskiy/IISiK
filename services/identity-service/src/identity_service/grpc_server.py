@@ -4,9 +4,13 @@ import grpc
 from identity.v1 import identity_pb2, identity_pb2_grpc
 from pydantic import ValidationError
 
+from shared.errors import DomainError
+from shared.grpc import abort_with_domain_error, extract_principal
+
 from .auth_service import AuthService
 from .errors import ErrorCode, IdentityError
 from .models import User
+from .read_service import IdentityReadService
 from .schemas import (
     AuthResponse,
     LoginRequest,
@@ -15,6 +19,7 @@ from .schemas import (
     RoleCode,
     StudentProfileInput,
 )
+from .write_service import IdentityWriteService
 
 error_statuses = {
     ErrorCode.EMAIL_EXISTS: grpc.StatusCode.ALREADY_EXISTS,
@@ -23,6 +28,7 @@ error_statuses = {
     ErrorCode.INVALID_REGISTRATION: grpc.StatusCode.INVALID_ARGUMENT,
     ErrorCode.USER_NOT_FOUND: grpc.StatusCode.NOT_FOUND,
     ErrorCode.USER_INACTIVE: grpc.StatusCode.PERMISSION_DENIED,
+    ErrorCode.SESSION_STORE_UNAVAILABLE: grpc.StatusCode.UNAVAILABLE,
 }
 
 
@@ -35,8 +41,23 @@ def grpc_errors(func):
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Invalid request")
         except IdentityError as error:
             await context.abort(error_statuses[error.code], error.message)
+        except DomainError as error:
+            await abort_with_domain_error(context, error)
 
     return wrapper
+
+
+def student_to_proto(student):
+    message = identity_pb2.StudentProfile(
+        id=str(student.id),
+        user_id=str(student.user_id),
+        status=student.status,
+    )
+    for field in ("education_level", "learning_goal", "timezone"):
+        value = getattr(student, field)
+        if value is not None:
+            setattr(message, field, value)
+    return message
 
 
 def user_to_proto(user: User):
@@ -48,12 +69,7 @@ def user_to_proto(user: User):
         status=user.status,
     )
     if user.student is not None:
-        student = identity_pb2.StudentProfile(id=str(user.student.id), status=user.student.status)
-        for field in ("education_level", "learning_goal", "timezone"):
-            value = getattr(user.student, field)
-            if value is not None:
-                setattr(student, field, value)
-        message.student.CopyFrom(student)
+        message.student.CopyFrom(student_to_proto(user.student))
     return message
 
 
@@ -88,6 +104,8 @@ async def get_access_token(context) -> str:
 class IdentityServicer(identity_pb2_grpc.IdentityServiceServicer):
     def __init__(self, service: AuthService) -> None:
         self.service = service
+        self.read_service = IdentityReadService(service.database)
+        self.write_service = IdentityWriteService(service.database)
 
     @grpc_errors
     async def Register(self, request, context):
@@ -135,6 +153,47 @@ class IdentityServicer(identity_pb2_grpc.IdentityServiceServicer):
     async def ValidateToken(self, request, context):
         access_token = await get_access_token(context)
         return user_to_proto(await self.service.get_user(access_token))
+
+    @grpc_errors
+    async def GetUserById(self, request, context):
+        from uuid import UUID
+
+        user = await self.read_service.get_user(UUID(request.user_id))
+        response = identity_pb2.GetUserByIdResponse()
+        if user is not None:
+            response.user.CopyFrom(user_to_proto(user))
+        return response
+
+    @grpc_errors
+    async def GetStudent(self, request, context):
+        from uuid import UUID
+
+        student = await self.read_service.get_student(UUID(request.student_id))
+        response = identity_pb2.GetStudentResponse()
+        if student is not None:
+            response.student.CopyFrom(student_to_proto(student))
+        return response
+
+    @grpc_errors
+    async def GetStudentByUserId(self, request, context):
+        from uuid import UUID
+
+        student = await self.read_service.get_student_by_user_id(UUID(request.user_id))
+        response = identity_pb2.GetStudentResponse()
+        if student is not None:
+            response.student.CopyFrom(student_to_proto(student))
+        return response
+
+    @grpc_errors
+    async def UpdateStudentProfile(self, request, context):
+        actor = extract_principal(context.invocation_metadata())
+        values = {
+            field: getattr(request, field)
+            for field in ("education_level", "learning_goal", "timezone")
+            if request.HasField(field)
+        }
+        student = await self.write_service.update_student_profile(actor.user_id, **values)
+        return student_to_proto(student)
 
 
 def create_grpc_server(service: AuthService, port: int):

@@ -77,10 +77,9 @@ class AuthService:
     async def logout(self, access_token: str, refresh_token: str) -> None:
         access = await self.tokens.validate_access(access_token)
         refresh = self.tokens.decode(refresh_token, "refresh")
-        if access.subject != refresh.subject:
-            raise IdentityError(ErrorCode.INVALID_TOKEN, "Tokens belong to different users")
-        await self.tokens.blacklist_access(access)
-        await self.tokens.revoke_refresh(refresh_token)
+        if access.subject != refresh.subject or access.session_id != refresh.session_id:
+            raise IdentityError(ErrorCode.INVALID_TOKEN, "Tokens belong to different sessions")
+        await self.tokens.revoke_session(access, refresh)
 
     async def get_user(self, access_token: str) -> User:
         payload = await self.tokens.validate_access(access_token)

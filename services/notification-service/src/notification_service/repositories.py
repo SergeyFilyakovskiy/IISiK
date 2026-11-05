@@ -22,7 +22,9 @@ class NotificationRepository:
         source_event_id: UUID | None,
     ) -> NotificationDTO:
         async with self.database.session() as session:
-            existing = await session.scalar(self._find_by_source(event_type, source_event_id))
+            existing = await session.scalar(
+                self._find_by_source(user_id, event_type, source_event_id)
+            )
             if existing is not None:
                 return self._to_dto(existing)
 
@@ -38,7 +40,9 @@ class NotificationRepository:
                 await session.commit()
             except IntegrityError:
                 await session.rollback()
-                existing = await session.scalar(self._find_by_source(event_type, source_event_id))
+                existing = await session.scalar(
+                    self._find_by_source(user_id, event_type, source_event_id)
+                )
                 if existing is None:
                     raise
                 return self._to_dto(existing)
@@ -69,9 +73,11 @@ class NotificationRepository:
 
     @staticmethod
     def _find_by_source(
-        event_type: str, source_event_id: UUID | None
+        user_id: UUID, event_type: str, source_event_id: UUID | None
     ) -> Select[tuple[Notification]]:
-        statement = select(Notification).where(Notification.event_type == event_type)
+        statement = select(Notification).where(
+            Notification.user_id == user_id, Notification.event_type == event_type
+        )
         if source_event_id is None:
             return statement.where(Notification.source_event_id.is_(None))
         return statement.where(Notification.source_event_id == source_event_id)

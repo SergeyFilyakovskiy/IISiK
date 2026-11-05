@@ -11,9 +11,10 @@ class Notification(Base):
     __tablename__ = "notifications"
     __table_args__ = (
         UniqueConstraint(
+            "user_id",
             "event_type",
             "source_event_id",
-            name="uq_notifications_event_type_source_event_id",
+            name="uq_notifications_user_event_source",
         ),
     )
 
