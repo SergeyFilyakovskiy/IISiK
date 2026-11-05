@@ -41,6 +41,40 @@ class PaymentService:
             normalized_payment_method,
         )
 
+    async def process_payment(
+        self,
+        booking_id: UUID,
+        student_id: UUID,
+        teacher_id: UUID,
+        amount: Decimal,
+        currency: str,
+        payment_method: str,
+    ) -> PaymentDTO:
+        existing = await self.repository.get_payment_by_booking(booking_id)
+        if existing is not None:
+            if (
+                existing.student_id != student_id
+                or existing.teacher_id != teacher_id
+                or existing.amount != amount
+                or existing.currency != currency.strip().upper()
+                or existing.payment_method != payment_method.strip()
+            ):
+                raise DomainError(
+                    ErrorCode.CONFLICT, "Payment request conflicts with existing payment"
+                )
+            if existing.status == "SUCCEEDED":
+                return existing
+            if existing.status in {"FAILED", "REFUNDED"}:
+                raise DomainError(ErrorCode.CONFLICT, "Payment cannot be processed in its status")
+            payment = existing
+        else:
+            payment = await self.create_payment(
+                booking_id, student_id, teacher_id, amount, currency, payment_method
+            )
+        if payment.payment_method.upper() == "FAIL":
+            return await self.fail_payment(payment.id, "Mock payment failure")
+        return await self.mark_payment_succeeded(payment.id, datetime.now().astimezone())
+
     async def get_payment(self, payment_id: UUID) -> PaymentDTO | None:
         return await self.repository.get_payment(payment_id)
 
@@ -56,6 +90,9 @@ class PaymentService:
         reason: str | None = None,
         refunded_at: datetime | None = None,
     ) -> PaymentDTO:
+        payment = await self.repository.get_payment(payment_id)
+        if payment is not None and payment.status == "REFUNDED":
+            return payment
         return await self.repository.refund_payment(payment_id, reason, refunded_at)
 
     async def list_payments(
