@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from shared.database import Database
 from shared.errors import DomainError, ErrorCode
 
+from .cache import SchedulingCache
 from .models import Lesson, ScheduleSlot
 from .repositories import SchedulingRepository
 from .schemas import LessonDTO, ScheduleSlotDTO
@@ -16,8 +17,9 @@ from .schemas import LessonDTO, ScheduleSlotDTO
 class SchedulingService:
     _LESSON_STATUSES = {"AVAILABLE", "RESERVED", "BOOKED", "COMPLETED", "CANCELLED"}
 
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, cache: SchedulingCache | None = None) -> None:
         self.database = database
+        self.cache = cache
 
     async def get_lesson(self, lesson_id: UUID) -> LessonDTO | None:
         async with self.database.session() as session:
@@ -240,19 +242,27 @@ class SchedulingService:
                 ErrorCode.VALIDATION_ERROR, "start_from must be less than or equal to end_to"
             )
 
-        async with self.database.session() as session:
-            lessons = await SchedulingRepository(session).list_available_lessons(
-                teacher_id=teacher_id,
-                subject_id=subject_id,
-                start_from=start_from,
-                end_to=end_to,
-                status=normalized_status,
-                min_price=min_price,
-                max_price=max_price,
-                sort_by=normalized_sort_by,
-                sort_direction=normalized_direction,
-            )
-            return [self._to_lesson_dto(lesson) for lesson in lessons]
+        filters = {
+            "teacher_id": teacher_id,
+            "subject_id": subject_id,
+            "start_from": start_from,
+            "end_to": end_to,
+            "status": normalized_status,
+            "min_price": min_price,
+            "max_price": max_price,
+            "sort_by": normalized_sort_by,
+            "sort_direction": normalized_direction,
+        }
+
+        async def load():
+            async with self.database.session() as session:
+                lessons = await SchedulingRepository(session).list_available_lessons(**filters)
+            return SchedulingCache.serialize([self._to_lesson_dto(lesson) for lesson in lessons])
+
+        if self.cache is not None:
+            return await self.cache.list_available(filters, load)
+        value = await load()
+        return [LessonDTO(**item) for item in value]
 
     async def _transition_or_current(
         self, lesson_id: UUID, current_status: str, allowed_statuses: tuple[str, ...]

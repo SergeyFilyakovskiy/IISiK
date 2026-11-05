@@ -6,7 +6,7 @@ from review.v1 import review_pb2, review_pb2_grpc
 
 from shared.errors import DomainError, ErrorCode
 from shared.events import publish_event
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 from shared.kafka import KafkaEventProducer
 
 from .workflows import ReviewWorkflowService
@@ -24,7 +24,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def review_to_proto(dto):

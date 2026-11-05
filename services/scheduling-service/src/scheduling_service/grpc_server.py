@@ -8,7 +8,7 @@ from scheduling.v1 import scheduling_pb2, scheduling_pb2_grpc
 
 from shared.errors import DomainError, ErrorCode
 from shared.events import publish_event
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 from shared.kafka import KafkaEventProducer
 
 from .workflows import SchedulingWorkflowService
@@ -18,7 +18,13 @@ def rpc_handler(func):
     @wraps(func)
     async def wrapper(self, request, context):
         try:
-            return await func(self, request, context)
+            result = await func(self, request, context)
+            if (
+                func.__name__ not in {"GetLesson", "ListSchedule", "ListAvailableLessons"}
+                and self.service.cache is not None
+            ):
+                await self.service.cache.invalidate()
+            return result
         except DomainError as error:
             await abort_with_domain_error(context, error)
         except ValueError as error:
@@ -26,7 +32,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def slot_to_proto(dto):

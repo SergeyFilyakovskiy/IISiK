@@ -17,6 +17,8 @@ class SchedulingWorkflowService:
 
     async def _require_teacher(self, actor: CurrentUser, teacher_id: UUID) -> None:
         require_role(actor, Role.TEACHER, admin_override=True)
+        if actor.role is Role.ADMIN:
+            return
         teacher = await self.catalog.get_teacher_by_user_id(str(actor.user_id), actor)
         if teacher is None or teacher.id != str(teacher_id):
             raise DomainError(ErrorCode.FORBIDDEN, "Teacher does not own this resource")
