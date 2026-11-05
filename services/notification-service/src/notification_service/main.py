@@ -25,7 +25,7 @@ async def serve() -> None:
             "booking.created",
             "booking.cancelled",
             "payment.completed",
-            "scheduling.lesson.completed",
+            "booking.completed",
         ],
         "notification-service",
         NotificationEventHandler(service, identity),

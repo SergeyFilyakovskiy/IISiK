@@ -6,7 +6,7 @@ from notification.v1 import notification_pb2, notification_pb2_grpc
 
 from shared.auth import Role
 from shared.errors import DomainError, ErrorCode
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 
 from .service import NotificationService
 
@@ -23,7 +23,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def notification_to_proto(dto):

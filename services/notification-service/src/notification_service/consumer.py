@@ -29,7 +29,7 @@ class NotificationEventHandler:
                 "Payment completed",
                 "Your payment has succeeded",
             ),
-            "scheduling.lesson.completed": (
+            "booking.completed": (
                 "LessonCompleted",
                 "Lesson completed",
                 "Your lesson is completed",

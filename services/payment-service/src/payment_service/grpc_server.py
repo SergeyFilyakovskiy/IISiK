@@ -9,7 +9,7 @@ from payment.v1 import payment_pb2, payment_pb2_grpc
 from shared.auth import CurrentUser, Role, require_student_owner, require_teacher_owner
 from shared.errors import DomainError, ErrorCode
 from shared.events import publish_event
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 from shared.kafka import KafkaEventProducer
 
 from .service import PaymentService
@@ -27,7 +27,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def payment_to_proto(dto):

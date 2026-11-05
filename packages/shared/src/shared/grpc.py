@@ -1,6 +1,7 @@
 import asyncio
 import math
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from functools import wraps
 from typing import Never, TypeVar
 
 import grpc
@@ -8,10 +9,21 @@ import grpc.aio
 
 from shared.auth import CurrentUser, principal_from_metadata, principal_to_metadata
 from shared.errors import DomainError, ErrorCode
-from shared.logging import get_log_context
+from shared.logging import get_log_context, log_context
 
 CORRELATION_ID_METADATA_KEY = "correlation-id"
 DOMAIN_ERROR_CODE_METADATA_KEY = "domain-error-code"
+
+
+def observe_rpc(func):
+    @wraps(func)
+    async def wrapper(self, request, context):
+        correlation_id = extract_correlation_id(context.invocation_metadata())
+        with log_context(operation=func.__name__, correlation_id=correlation_id):
+            return await func(self, request, context)
+
+    return wrapper
+
 
 Metadata = Mapping[str, str | bytes] | Iterable[tuple[str, str | bytes]]
 RequestT = TypeVar("RequestT")
