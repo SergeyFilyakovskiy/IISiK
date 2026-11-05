@@ -5,6 +5,7 @@ import httpx
 
 from shared.auth import CurrentUser, Role
 from shared.errors import DomainError, ErrorCode
+from shared.logging import get_log_context
 
 from .dto import AuthResponse, LoginRequest, RefreshRequest, RegisterRequest, UserDTO
 
@@ -67,6 +68,11 @@ class AuthClient:
         return await self._request("POST", path, json=payload)
 
     async def _request(self, method: str, path: str, **kwargs):
+        correlation_id = get_log_context().get("correlation_id")
+        if correlation_id:
+            headers = dict(kwargs.get("headers", {}))
+            headers["x-correlation-id"] = correlation_id
+            kwargs["headers"] = headers
         try:
             response = await self.client.request(method, path, **kwargs)
         except httpx.TimeoutException as error:

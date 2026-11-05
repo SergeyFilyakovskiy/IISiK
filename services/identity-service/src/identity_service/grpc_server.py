@@ -5,7 +5,7 @@ from identity.v1 import identity_pb2, identity_pb2_grpc
 from pydantic import ValidationError
 
 from shared.errors import DomainError
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 
 from .auth_service import AuthService
 from .errors import ErrorCode, IdentityError
@@ -44,7 +44,7 @@ def grpc_errors(func):
         except DomainError as error:
             await abort_with_domain_error(context, error)
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 def student_to_proto(student):

@@ -6,7 +6,7 @@ from analytics.v1 import analytics_pb2, analytics_pb2_grpc
 
 from shared.auth import Role, require_role
 from shared.errors import DomainError, ErrorCode
-from shared.grpc import abort_with_domain_error, extract_principal
+from shared.grpc import abort_with_domain_error, extract_principal, observe_rpc
 
 from .service import AnalyticsService
 
@@ -23,7 +23,7 @@ def rpc_handler(func):
                 context, DomainError(ErrorCode.VALIDATION_ERROR, str(error))
             )
 
-    return wrapper
+    return observe_rpc(wrapper)
 
 
 class AnalyticsServicer(analytics_pb2_grpc.AnalyticsServiceServicer):

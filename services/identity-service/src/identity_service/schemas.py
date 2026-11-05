@@ -49,6 +49,7 @@ class LogoutRequest(BaseModel):
 
 class StudentProfileResponse(BaseModel):
     id: UUID
+    user_id: UUID
     education_level: str | None
     learning_goal: str | None
     timezone: str | None

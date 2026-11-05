@@ -7,6 +7,7 @@ def to_user_response(user: User) -> UserResponse:
     if user.student is not None:
         student = StudentProfileResponse(
             id=user.student.id,
+            user_id=user.student.user_id,
             education_level=user.student.education_level,
             learning_goal=user.student.learning_goal,
             timezone=user.student.timezone,
