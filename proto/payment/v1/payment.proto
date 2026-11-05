@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package payment.v1;
+
+service PaymentService {
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+  rpc GetPaymentByBooking(GetPaymentByBookingRequest) returns (GetPaymentResponse);
+  rpc ListPayments(ListPaymentsRequest) returns (ListPaymentsResponse);
+  rpc ProcessPayment(ProcessPaymentRequest) returns (Payment);
+  rpc RefundPayment(RefundPaymentRequest) returns (Payment);
+}
+
+message Payment {
+  string id = 1;
+  string booking_id = 2;
+  string student_id = 3;
+  string teacher_id = 4;
+  string amount = 5;
+  string currency = 6;
+  string payment_method = 7;
+  string status = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  optional string paid_at = 11;
+  optional string refunded_at = 12;
+  optional string failure_reason = 13;
+  optional string refund_reason = 14;
+}
+
+message GetPaymentRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentByBookingRequest {
+  string booking_id = 1;
+}
+
+message GetPaymentResponse {
+  optional Payment payment = 1;
+}
+
+message ListPaymentsRequest {
+  optional string student_id = 1;
+  optional string status = 2;
+  optional string created_from = 3;
+  optional string created_to = 4;
+  optional string min_amount = 5;
+  optional string max_amount = 6;
+  string sort_by = 7;
+  string sort_direction = 8;
+}
+
+message ListPaymentsResponse {
+  repeated Payment items = 1;
+}
+
+message ProcessPaymentRequest {
+  string booking_id = 1;
+  string student_id = 2;
+  string teacher_id = 3;
+  string amount = 4;
+  string currency = 5;
+  string payment_method = 6;
+  string idempotency_key = 7;
+}
+
+message RefundPaymentRequest {
+  string payment_id = 1;
+  optional string reason = 2;
+}

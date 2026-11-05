@@ -401,11 +401,13 @@ Identity Service уже предоставляет HTTP API на порту `800
 
 Access JWT действует 5 минут. Refresh JWT хранится в Redis 30 дней и заменяется при каждом refresh, поэтому старый refresh нельзя использовать повторно. Logout помещает `jti` access в Redis blacklist на оставшийся срок жизни. gRPC-контракт `identity.v1.IdentityService` содержит операции Register, Login, Refresh, Logout, GetUser и ValidateToken; защищённые вызовы используют metadata `authorization: Bearer <access>`.
 
-### GraphQL API для чтения
+### GraphQL API
 
-GraphQL API доступен на `POST /graphql` (порт `4000`) и реализует Query для получения пользователей, профилей преподавателей, предметов, расписания, занятий, записей, платежей, отзывов, уведомлений и аналитики. Поддерживаются получение по ID, списки, фильтры, пагинация и связанные данные (`TeacherProfile → User`, `Lesson → Teacher/Subject`, `Booking → Lesson/Payment`).
+GraphQL API доступен на `POST /graphql` (порт `4000`) и реализует Query для получения пользователей, профилей преподавателей, предметов, расписания, занятий, записей, платежей, отзывов, уведомлений и аналитики. Поддерживаются получение по ID, списки, фильтры, сортировка, пагинация и связанные данные (`TeacherProfile → User`, `Lesson → Teacher/Subject`, `Booking → Lesson/Payment`). Query `adminAnalytics` возвращает агрегированные показатели платформы и преподавателей за период.
 
-По требованиям ЛР3 GraphQL использует mock-шлюзы вместо сетевых gRPC-вызовов. Шлюзы обращаются только к публичным application services соответствующих доменов; каждый service/repository-слой работает исключительно со своей БД. Для проверки добавлены согласованные seed-миграции во все восемь БД. Kafka и write-Mutation в этот этап не входят.
+По требованиям ЛР4 добавлены Mutation для регистрации и аутентификации, управления профилем преподавателя и предметами, расписания, публикации и переноса занятий, записи, оплаты, отмены, завершения занятия и отзыва. Resolver только преобразует GraphQL-данные и вызывает BFF; бизнес-проверки и изменения состояния выполняют application services. Сквозные сценарии используют резервирование занятия, компенсации при ошибках, уведомления и идемпотентную запись аналитики.
+
+GraphQL по-прежнему использует mock-шлюзы вместо сетевых gRPC-вызовов. Шлюзы обращаются только к публичным application services соответствующих доменов; каждый service/repository-слой работает исключительно со своей БД. Kafka в этот этап не входит.
 
 ---
 
@@ -572,7 +574,7 @@ Content-Type: application/json
 
 ```graphql
 query {
-  teachers(filter: { subjectId: "math", minRating: 4.5 }) {
+  teachers(filter: { subjectId: "uuid-subject", minRating: 4.5 }) {
     items {
       id
       about
@@ -587,7 +589,7 @@ query {
 
 ```graphql
 mutation {
-  bookLesson(input: { lessonId: "uuid-lesson" }) {
+  bookLesson(input: { lessonId: "uuid-lesson", userId: "uuid-user" }) {
     id
     status
     price

@@ -9,6 +9,10 @@ service IdentityService {
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc GetUser(GetUserRequest) returns (User);
   rpc ValidateToken(ValidateTokenRequest) returns (User);
+  rpc GetUserById(GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc GetStudent(GetStudentRequest) returns (GetStudentResponse);
+  rpc GetStudentByUserId(GetStudentByUserIdRequest) returns (GetStudentResponse);
+  rpc UpdateStudentProfile(UpdateStudentProfileRequest) returns (StudentProfile);
 }
 
 enum Role {
@@ -30,6 +34,7 @@ message StudentProfile {
   optional string learning_goal = 3;
   optional string timezone = 4;
   string status = 5;
+  string user_id = 6;
 }
 
 message User {
@@ -69,6 +74,32 @@ message LogoutResponse {
 message GetUserRequest {}
 
 message ValidateTokenRequest {}
+
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+
+message GetUserByIdResponse {
+  optional User user = 1;
+}
+
+message GetStudentRequest {
+  string student_id = 1;
+}
+
+message GetStudentByUserIdRequest {
+  string user_id = 1;
+}
+
+message GetStudentResponse {
+  optional StudentProfile student = 1;
+}
+
+message UpdateStudentProfileRequest {
+  optional string education_level = 1;
+  optional string learning_goal = 2;
+  optional string timezone = 3;
+}
 
 message AuthResponse {
   string access_token = 1;

@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package scheduling.v1;
+
+service SchedulingService {
+  rpc GetLesson(GetLessonRequest) returns (GetLessonResponse);
+  rpc ListSchedule(ListScheduleRequest) returns (ListScheduleResponse);
+  rpc ListAvailableLessons(ListAvailableLessonsRequest) returns (ListLessonsResponse);
+  rpc CreateScheduleSlot(CreateScheduleSlotRequest) returns (ScheduleSlot);
+  rpc UpdateScheduleSlot(UpdateScheduleSlotRequest) returns (ScheduleSlot);
+  rpc DeleteScheduleSlot(DeleteScheduleSlotRequest) returns (DeleteScheduleSlotResponse);
+  rpc PublishLesson(PublishLessonRequest) returns (Lesson);
+  rpc CancelLesson(CancelLessonRequest) returns (Lesson);
+  rpc RescheduleLesson(RescheduleLessonRequest) returns (Lesson);
+  rpc ReserveLesson(LessonTransitionRequest) returns (Lesson);
+  rpc ReleaseLesson(LessonTransitionRequest) returns (Lesson);
+  rpc MarkLessonBooked(LessonTransitionRequest) returns (Lesson);
+  rpc CompleteLesson(LessonTransitionRequest) returns (Lesson);
+}
+
+message ScheduleSlot {
+  string id = 1;
+  string teacher_id = 2;
+  int32 weekday = 3;
+  string start_time = 4;
+  string end_time = 5;
+  bool is_active = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message Lesson {
+  string id = 1;
+  string teacher_id = 2;
+  string subject_id = 3;
+  optional string schedule_slot_id = 4;
+  string start_at = 5;
+  int32 duration_minutes = 6;
+  string status = 7;
+  string price = 8;
+  string currency = 9;
+  string created_at = 10;
+  string updated_at = 11;
+}
+
+message GetLessonRequest {
+  string lesson_id = 1;
+}
+
+message GetLessonResponse {
+  optional Lesson lesson = 1;
+}
+
+message ListScheduleRequest {
+  string teacher_id = 1;
+}
+
+message ListScheduleResponse {
+  repeated ScheduleSlot items = 1;
+}
+
+message ListAvailableLessonsRequest {
+  optional string teacher_id = 1;
+  optional string subject_id = 2;
+  optional string start_from = 3;
+  optional string end_to = 4;
+  optional string min_price = 5;
+  optional string max_price = 6;
+  string sort_by = 7;
+  string sort_direction = 8;
+}
+
+message ListLessonsResponse {
+  repeated Lesson items = 1;
+}
+
+message CreateScheduleSlotRequest {
+  string teacher_id = 1;
+  int32 weekday = 2;
+  string start_time = 3;
+  string end_time = 4;
+}
+
+message UpdateScheduleSlotRequest {
+  string slot_id = 1;
+  optional int32 weekday = 2;
+  optional string start_time = 3;
+  optional string end_time = 4;
+  optional bool is_active = 5;
+}
+
+message DeleteScheduleSlotRequest {
+  string slot_id = 1;
+}
+
+message DeleteScheduleSlotResponse {
+  bool deleted = 1;
+}
+
+message PublishLessonRequest {
+  string teacher_id = 1;
+  string subject_id = 2;
+  optional string schedule_slot_id = 3;
+  string start_at = 4;
+  int32 duration_minutes = 5;
+}
+
+message CancelLessonRequest {
+  string lesson_id = 1;
+  optional string reason = 2;
+}
+
+message RescheduleLessonRequest {
+  string lesson_id = 1;
+  string new_start_at = 2;
+}
+
+message LessonTransitionRequest {
+  string lesson_id = 1;
+}

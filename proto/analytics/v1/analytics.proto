@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package analytics.v1;
+
+service AnalyticsService {
+  rpc GetReport(GetReportRequest) returns (AnalyticsReport);
+}
+
+message TeacherMetric {
+  string teacher_id = 1;
+  string period_date = 2;
+  int32 lessons_completed = 3;
+  string revenue = 4;
+  string avg_rating = 5;
+  int32 reviews_count = 6;
+}
+
+message AnalyticsReport {
+  string period_from = 1;
+  string period_to = 2;
+  int32 lessons_completed = 3;
+  int32 bookings_created = 4;
+  string revenue = 5;
+  string avg_rating = 6;
+  repeated TeacherMetric teachers = 7;
+}
+
+message GetReportRequest {
+  string period_from = 1;
+  string period_to = 2;
+}

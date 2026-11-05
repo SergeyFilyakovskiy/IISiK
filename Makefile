@@ -1,5 +1,7 @@
 .PHONY: install sync generate-proto lint format test health
 
+PROTO_FILES := $(wildcard proto/*/v1/*.proto)
+
 install:
 	uv sync --all-packages
 	uv run pre-commit install
@@ -11,7 +13,7 @@ generate-proto:
 	uv run python -m grpc_tools.protoc -Iproto \
 		--python_out=packages/proto-generated/src \
 		--grpc_python_out=packages/proto-generated/src \
-		proto/identity/v1/identity.proto
+		$(PROTO_FILES)
 
 lint:
 	uv run pre-commit run --all-files

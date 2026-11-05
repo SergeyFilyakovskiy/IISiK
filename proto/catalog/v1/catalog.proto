@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+service CatalogService {
+  rpc GetTeacher(GetTeacherRequest) returns (GetTeacherResponse);
+  rpc GetTeacherByUserId(GetTeacherByUserIdRequest) returns (GetTeacherResponse);
+  rpc ListTeachers(ListTeachersRequest) returns (TeacherPage);
+  rpc GetSubject(GetSubjectRequest) returns (GetSubjectResponse);
+  rpc ListSubjects(ListSubjectsRequest) returns (ListSubjectsResponse);
+  rpc CreateTeacherProfile(CreateTeacherProfileRequest) returns (Teacher);
+  rpc UpdateTeacherProfile(UpdateTeacherProfileRequest) returns (Teacher);
+  rpc AddTeacherSubject(TeacherSubjectRequest) returns (Teacher);
+  rpc RemoveTeacherSubject(RemoveTeacherSubjectRequest) returns (Teacher);
+  rpc CreateSubject(CreateSubjectRequest) returns (Subject);
+  rpc UpdateSubject(UpdateSubjectRequest) returns (Subject);
+}
+
+message Subject {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  bool is_active = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message TeacherSubject {
+  Subject subject = 1;
+  optional string proficiency_level = 2;
+}
+
+message Rating {
+  string teacher_id = 1;
+  string avg_rating = 2;
+  int32 reviews_count = 3;
+  string updated_at = 4;
+}
+
+message Teacher {
+  string id = 1;
+  string user_id = 2;
+  optional string about = 3;
+  int32 experience_years = 4;
+  string price_per_lesson = 5;
+  string currency = 6;
+  string profile_status = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  repeated TeacherSubject subjects = 10;
+  optional Rating rating = 11;
+}
+
+message PageInfo {
+  int32 page = 1;
+  int32 page_size = 2;
+  int32 total_items = 3;
+  int32 total_pages = 4;
+}
+
+message TeacherPage {
+  repeated Teacher items = 1;
+  PageInfo page_info = 2;
+}
+
+message GetTeacherRequest {
+  string teacher_id = 1;
+}
+
+message GetTeacherByUserIdRequest {
+  string user_id = 1;
+}
+
+message GetTeacherResponse {
+  optional Teacher teacher = 1;
+}
+
+message ListTeachersRequest {
+  optional string subject_id = 1;
+  optional string min_rating = 2;
+  optional string max_price = 3;
+  string sort_by = 4;
+  string sort_direction = 5;
+  int32 page = 6;
+  int32 page_size = 7;
+}
+
+message GetSubjectRequest {
+  string subject_id = 1;
+}
+
+message GetSubjectResponse {
+  optional Subject subject = 1;
+}
+
+message ListSubjectsRequest {
+  optional string search = 1;
+  optional bool is_active = 2;
+  string sort_direction = 3;
+}
+
+message ListSubjectsResponse {
+  repeated Subject items = 1;
+}
+
+message CreateTeacherProfileRequest {
+  optional string about = 1;
+  int32 experience_years = 2;
+  string price_per_lesson = 3;
+  string currency = 4;
+  repeated string subject_ids = 5;
+}
+
+message UpdateTeacherProfileRequest {
+  string teacher_id = 1;
+  optional string about = 2;
+  optional int32 experience_years = 3;
+  optional string price_per_lesson = 4;
+  optional string currency = 5;
+  optional string profile_status = 6;
+}
+
+message TeacherSubjectRequest {
+  string teacher_id = 1;
+  string subject_id = 2;
+  optional string proficiency_level = 3;
+}
+
+message RemoveTeacherSubjectRequest {
+  string teacher_id = 1;
+  string subject_id = 2;
+}
+
+message CreateSubjectRequest {
+  string name = 1;
+  optional string description = 2;
+  bool is_active = 3;
+}
+
+message UpdateSubjectRequest {
+  string subject_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional bool is_active = 4;
+}

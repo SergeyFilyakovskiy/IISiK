@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package review.v1;
+
+service ReviewService {
+  rpc ListTeacherReviews(ListTeacherReviewsRequest) returns (ReviewPage);
+  rpc CreateReview(CreateReviewRequest) returns (Review);
+}
+
+message Review {
+  string id = 1;
+  string lesson_id = 2;
+  string student_id = 3;
+  string teacher_id = 4;
+  int32 rating = 5;
+  optional string comment = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message PageInfo {
+  int32 page = 1;
+  int32 page_size = 2;
+  int32 total_items = 3;
+  int32 total_pages = 4;
+}
+
+message ReviewPage {
+  repeated Review items = 1;
+  PageInfo page_info = 2;
+}
+
+message ListTeacherReviewsRequest {
+  string teacher_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  optional int32 min_rating = 4;
+  string sort_by = 5;
+  string sort_direction = 6;
+}
+
+message CreateReviewRequest {
+  string lesson_id = 1;
+  int32 rating = 2;
+  optional string comment = 3;
+  string idempotency_key = 4;
+}

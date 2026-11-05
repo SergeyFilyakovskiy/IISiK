@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package notification.v1;
+
+service NotificationService {
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+}
+
+message Notification {
+  string id = 1;
+  string user_id = 2;
+  string event_type = 3;
+  string title = 4;
+  string body = 5;
+  string status = 6;
+  optional string source_event_id = 7;
+  string created_at = 8;
+  optional string sent_at = 9;
+}
+
+message ListNotificationsRequest {
+  optional string user_id = 1;
+  optional string status = 2;
+  optional string event_type = 3;
+  string sort_direction = 4;
+}
+
+message ListNotificationsResponse {
+  repeated Notification items = 1;
+}

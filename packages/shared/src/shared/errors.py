@@ -7,6 +7,8 @@ class ErrorCode(StrEnum):
     CONFLICT = "CONFLICT"
     UNAUTHENTICATED = "UNAUTHENTICATED"
     FORBIDDEN = "FORBIDDEN"
+    TIMEOUT = "TIMEOUT"
+    UNAVAILABLE = "UNAVAILABLE"
 
 
 class DomainError(Exception):

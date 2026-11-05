@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package booking.v1;
+
+service BookingService {
+  rpc GetBooking(GetBookingRequest) returns (GetBookingResponse);
+  rpc GetBookingByLesson(GetBookingByLessonRequest) returns (GetBookingResponse);
+  rpc ListBookings(ListBookingsRequest) returns (ListBookingsResponse);
+  rpc BookLesson(BookLessonRequest) returns (Booking);
+  rpc PayBooking(PayBookingRequest) returns (Booking);
+  rpc CancelBooking(CancelBookingRequest) returns (Booking);
+  rpc CancelLesson(CancelLessonRequest) returns (BookingCancellation);
+  rpc CompleteLesson(CompleteLessonRequest) returns (Booking);
+}
+
+message Booking {
+  string id = 1;
+  string lesson_id = 2;
+  string student_id = 3;
+  string teacher_id = 4;
+  string subject_id = 5;
+  string status = 6;
+  string price = 7;
+  string currency = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  optional string paid_at = 11;
+  optional string completed_at = 12;
+  optional string cancelled_at = 13;
+  optional string cancel_reason = 14;
+}
+
+message GetBookingRequest {
+  string booking_id = 1;
+}
+
+message GetBookingByLessonRequest {
+  string lesson_id = 1;
+}
+
+message GetBookingResponse {
+  optional Booking booking = 1;
+}
+
+message ListBookingsRequest {
+  optional string student_id = 1;
+  optional string status = 2;
+  optional string created_from = 3;
+  optional string created_to = 4;
+  optional string min_price = 5;
+  optional string max_price = 6;
+  string sort_by = 7;
+  string sort_direction = 8;
+}
+
+message ListBookingsResponse {
+  repeated Booking items = 1;
+}
+
+message BookLessonRequest {
+  string lesson_id = 1;
+  string idempotency_key = 2;
+}
+
+message PayBookingRequest {
+  string booking_id = 1;
+  string payment_method = 2;
+  string idempotency_key = 3;
+}
+
+message CancelBookingRequest {
+  string booking_id = 1;
+  optional string reason = 2;
+}
+
+message CancelLessonRequest {
+  string lesson_id = 1;
+  optional string reason = 2;
+}
+
+message BookingCancellation {
+  optional Booking booking = 1;
+  bool cancelled = 2;
+}
+
+message CompleteLessonRequest {
+  string lesson_id = 1;
+}
