@@ -1,33 +1,22 @@
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    identity_database_url: str
-    catalog_database_url: str
-    scheduling_database_url: str
-    booking_database_url: str
-    payment_database_url: str
-    review_database_url: str
-    notification_database_url: str
-    analytics_database_url: str
-    identity_redis_url: str
-    jwt_secret: SecretStr = Field(min_length=32)
-    jwt_algorithm: str = "HS256"
-    jwt_access_ttl_minutes: int = Field(default=5, gt=0)
-    jwt_refresh_ttl_days: int = Field(default=30, gt=0)
-
-    @property
-    def access_ttl_seconds(self) -> int:
-        return self.jwt_access_ttl_minutes * 60
-
-    @property
-    def refresh_ttl_seconds(self) -> int:
-        return self.jwt_refresh_ttl_days * 24 * 60 * 60
+    auth_service_url: str = "http://identity-service:8001"
+    identity_grpc_address: str = "identity-service:50051"
+    catalog_grpc_address: str = "catalog-service:50052"
+    scheduling_grpc_address: str = "scheduling-service:50053"
+    booking_grpc_address: str = "booking-service:50054"
+    payment_grpc_address: str = "payment-service:50055"
+    review_grpc_address: str = "review-service:50056"
+    notification_grpc_address: str = "notification-service:50057"
+    analytics_grpc_address: str = "analytics-service:50058"
+    grpc_timeout_seconds: float = Field(default=5, gt=0)
 
 
 @lru_cache

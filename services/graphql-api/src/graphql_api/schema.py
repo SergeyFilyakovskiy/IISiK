@@ -7,9 +7,11 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
-from catalog_service.schemas import TeacherFilterDTO
+from shared.auth import Role as ActorRole
 
 from .bff import BffService, BookingView, LessonView, TeacherView
+from .context import actor
+from .dto import TeacherFilterDTO
 
 
 @strawberry.enum
@@ -427,12 +429,12 @@ def bff(info: Info) -> BffService:
 class Query:
     @strawberry.field
     async def user(self, info: Info, user_id: UUID) -> User | None:
-        result = await bff(info).get_user(user_id)
+        result = await bff(info).get_user(await actor(info), user_id)
         return map_user(result) if result else None
 
     @strawberry.field
     async def student_profile(self, info: Info, user_id: UUID) -> Student | None:
-        result = await bff(info).get_student(user_id)
+        result = await bff(info).get_student(await actor(info), user_id)
         return map_student(result) if result else None
 
     @strawberry.field
@@ -491,14 +493,14 @@ class Query:
         sort_direction: SortDirection = SortDirection.ASC,
     ) -> list[Lesson]:
         lessons = await bff(info).list_available_lessons(
-            teacher_id,
-            subject_id,
-            from_datetime,
-            to,
-            Decimal(str(min_price)) if min_price is not None else None,
-            Decimal(str(max_price)) if max_price is not None else None,
-            sort_by.value,
-            sort_direction.value,
+            teacher_id=teacher_id,
+            subject_id=subject_id,
+            start_from=from_datetime,
+            end_to=to,
+            min_price=Decimal(str(min_price)) if min_price is not None else None,
+            max_price=Decimal(str(max_price)) if max_price is not None else None,
+            sort_by=sort_by.value,
+            sort_direction=sort_direction.value,
         )
         return [map_lesson(lesson) for lesson in lessons]
 
@@ -509,14 +511,14 @@ class Query:
 
     @strawberry.field
     async def booking(self, info: Info, booking_id: UUID) -> Booking | None:
-        result = await bff(info).get_booking(booking_id)
+        result = await bff(info).get_booking(await actor(info), booking_id)
         return map_booking(result) if result else None
 
     @strawberry.field
     async def bookings(
         self,
         info: Info,
-        student_id: UUID,
+        student_id: UUID | None = None,
         status: BookingStatus | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
@@ -526,27 +528,28 @@ class Query:
         sort_direction: SortDirection = SortDirection.DESC,
     ) -> list[Booking]:
         result = await bff(info).list_bookings(
-            student_id,
-            status.value if status else None,
-            created_from,
-            created_to,
-            Decimal(str(min_price)) if min_price is not None else None,
-            Decimal(str(max_price)) if max_price is not None else None,
-            sort_by.value,
-            sort_direction.value,
+            await actor(info, ActorRole.STUDENT, ActorRole.TEACHER, ActorRole.ADMIN),
+            student_id=student_id,
+            status=status.value if status else None,
+            created_from=created_from,
+            created_to=created_to,
+            min_price=Decimal(str(min_price)) if min_price is not None else None,
+            max_price=Decimal(str(max_price)) if max_price is not None else None,
+            sort_by=sort_by.value,
+            sort_direction=sort_direction.value,
         )
         return [map_booking(booking) for booking in result]
 
     @strawberry.field
     async def payment(self, info: Info, payment_id: UUID) -> Payment | None:
-        result = await bff(info).get_payment(payment_id)
+        result = await bff(info).get_payment(await actor(info), payment_id)
         return map_payment(result) if result else None
 
     @strawberry.field
     async def payments(
         self,
         info: Info,
-        student_id: UUID,
+        student_id: UUID | None = None,
         status: PaymentStatus | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
@@ -556,14 +559,15 @@ class Query:
         sort_direction: SortDirection = SortDirection.DESC,
     ) -> list[Payment]:
         payments = await bff(info).list_payments(
-            student_id,
-            status.value if status else None,
-            created_from,
-            created_to,
-            Decimal(str(min_amount)) if min_amount is not None else None,
-            Decimal(str(max_amount)) if max_amount is not None else None,
-            sort_by.value,
-            sort_direction.value,
+            await actor(info, ActorRole.STUDENT, ActorRole.TEACHER, ActorRole.ADMIN),
+            student_id=student_id,
+            status=status.value if status else None,
+            created_from=created_from,
+            created_to=created_to,
+            min_amount=Decimal(str(min_amount)) if min_amount is not None else None,
+            max_amount=Decimal(str(max_amount)) if max_amount is not None else None,
+            sort_by=sort_by.value,
+            sort_direction=sort_direction.value,
         )
         return [map_payment(item) for item in payments]
 
@@ -580,11 +584,11 @@ class Query:
         page = page or PaginationInput()
         result = await bff(info).list_reviews(
             teacher_id,
-            page.page,
-            page.page_size,
-            min_rating,
-            sort_by.value,
-            sort_direction.value,
+            page=page.page,
+            page_size=page.page_size,
+            min_rating=min_rating,
+            sort_by=sort_by.value,
+            sort_direction=sort_direction.value,
         )
         return ReviewPage(
             items=[map_review(item) for item in result.items], page_info=page_info(result)
@@ -594,13 +598,17 @@ class Query:
     async def notifications(
         self,
         info: Info,
-        user_id: UUID,
+        user_id: UUID | None = None,
         status: str | None = None,
         event_type: str | None = None,
         sort_direction: SortDirection = SortDirection.DESC,
     ) -> list[Notification]:
         notifications = await bff(info).list_notifications(
-            user_id, status, event_type, sort_direction.value
+            await actor(info),
+            user_id=user_id,
+            status=status,
+            event_type=event_type,
+            sort_direction=sort_direction.value,
         )
         return [
             Notification(
@@ -619,7 +627,9 @@ class Query:
 
     @strawberry.field
     async def admin_analytics(self, info: Info, period: AnalyticsPeriodInput) -> AnalyticsReport:
-        result = await bff(info).get_analytics(period.from_date, period.to_date)
+        result = await bff(info).get_analytics(
+            await actor(info, ActorRole.ADMIN), period.from_date, period.to_date
+        )
         return AnalyticsReport(
             period_from=result.period_from,
             period_to=result.period_to,
@@ -642,25 +652,13 @@ class Query:
 
 class DomainSchema(strawberry.Schema):
     def process_errors(self, errors, execution_context=None) -> None:
-        from identity_service.errors import ErrorCode as IdentityErrorCode
-        from identity_service.errors import IdentityError
         from shared.errors import DomainError
 
-        identity_codes = {
-            IdentityErrorCode.EMAIL_EXISTS: "CONFLICT",
-            IdentityErrorCode.INVALID_CREDENTIALS: "UNAUTHENTICATED",
-            IdentityErrorCode.INVALID_TOKEN: "UNAUTHENTICATED",
-            IdentityErrorCode.INVALID_REGISTRATION: "VALIDATION_ERROR",
-            IdentityErrorCode.USER_NOT_FOUND: "NOT_FOUND",
-            IdentityErrorCode.USER_INACTIVE: "FORBIDDEN",
-        }
         for error in errors:
             original = error.original_error
             code = None
             if isinstance(original, DomainError):
                 code = original.code.value
-            elif isinstance(original, IdentityError):
-                code = identity_codes[original.code]
             elif isinstance(original, ValueError):
                 code = "VALIDATION_ERROR"
             if code:
