@@ -24,6 +24,11 @@ class SchedulingService:
             lesson = await SchedulingRepository(session).get_lesson(lesson_id)
             return self._to_lesson_dto(lesson) if lesson is not None else None
 
+    async def get_schedule_slot(self, slot_id: UUID) -> ScheduleSlotDTO | None:
+        async with self.database.session() as session:
+            slot = await SchedulingRepository(session).get_schedule_slot(slot_id)
+            return self._to_schedule_slot_dto(slot) if slot is not None else None
+
     async def list_schedule(self, teacher_id: UUID) -> list[ScheduleSlotDTO]:
         async with self.database.session() as session:
             slots = await SchedulingRepository(session).list_schedule(teacher_id)
@@ -152,8 +157,8 @@ class SchedulingService:
             return self._to_lesson_dto(lesson)
 
     async def cancel_lesson(self, lesson_id: UUID, reason: str | None = None) -> LessonDTO:
-        return await self._transition_lesson(
-            lesson_id, ("AVAILABLE", "RESERVED", "BOOKED"), "CANCELLED"
+        return await self._transition_or_current(
+            lesson_id, "CANCELLED", ("AVAILABLE", "RESERVED", "BOOKED")
         )
 
     async def reschedule_lesson(self, lesson_id: UUID, new_start_at: datetime) -> LessonDTO:
@@ -197,16 +202,16 @@ class SchedulingService:
             return self._to_lesson_dto(updated)
 
     async def reserve_lesson(self, lesson_id: UUID) -> LessonDTO:
-        return await self._transition_lesson(lesson_id, ("AVAILABLE",), "RESERVED")
+        return await self._transition_or_current(lesson_id, "RESERVED", ("AVAILABLE",))
 
     async def release_lesson(self, lesson_id: UUID) -> LessonDTO:
-        return await self._transition_lesson(lesson_id, ("RESERVED", "BOOKED"), "AVAILABLE")
+        return await self._transition_or_current(lesson_id, "AVAILABLE", ("RESERVED", "BOOKED"))
 
     async def mark_lesson_booked(self, lesson_id: UUID) -> LessonDTO:
-        return await self._transition_lesson(lesson_id, ("RESERVED",), "BOOKED")
+        return await self._transition_or_current(lesson_id, "BOOKED", ("RESERVED",))
 
     async def complete_lesson(self, lesson_id: UUID) -> LessonDTO:
-        return await self._transition_lesson(lesson_id, ("BOOKED",), "COMPLETED")
+        return await self._transition_or_current(lesson_id, "COMPLETED", ("BOOKED",))
 
     async def list_available_lessons(
         self,
@@ -248,6 +253,14 @@ class SchedulingService:
                 sort_direction=normalized_direction,
             )
             return [self._to_lesson_dto(lesson) for lesson in lessons]
+
+    async def _transition_or_current(
+        self, lesson_id: UUID, current_status: str, allowed_statuses: tuple[str, ...]
+    ) -> LessonDTO:
+        lesson = await self.get_lesson(lesson_id)
+        if lesson is not None and lesson.status == current_status:
+            return lesson
+        return await self._transition_lesson(lesson_id, allowed_statuses, current_status)
 
     async def _transition_lesson(
         self, lesson_id: UUID, allowed_statuses: tuple[str, ...], new_status: str
