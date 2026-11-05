@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
 COPY services/catalog-service/pyproject.toml ./services/catalog-service/
 
 RUN mkdir -p packages/shared/src/shared \
@@ -23,6 +24,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/catalog-service/src ./services/catalog-service/src
 COPY services/catalog-service/alembic.ini ./services/catalog-service/alembic.ini
 COPY services/catalog-service/migrations ./services/catalog-service/migrations
@@ -52,9 +54,10 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/catalog-service/src:/app/packages/shared/src:/app/packages/proto-generated/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-CMD ["uv", "run", "--package", "catalog-service", "uvicorn", "catalog_service.main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["uv", "run", "--package", "catalog-service", "python", "-m", "catalog_service.main"]

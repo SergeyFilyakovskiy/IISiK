@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
 COPY services/notification-service/pyproject.toml ./services/notification-service/
 
 RUN mkdir -p packages/shared/src/shared \
@@ -23,6 +24,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/notification-service/src ./services/notification-service/src
 COPY services/notification-service/alembic.ini ./services/notification-service/alembic.ini
 COPY services/notification-service/migrations ./services/notification-service/migrations
@@ -53,8 +55,9 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/notification-service/src:/app/packages/shared/src:/app/packages/proto-generated/src" \
     PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-CMD ["uv", "run", "--package", "notification-service", "python", "-m", "notification_service.consumer"]
+CMD ["uv", "run", "--package", "notification-service", "python", "-m", "notification_service.main"]

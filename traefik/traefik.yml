@@ -18,7 +18,7 @@ entryPoints:
 providers:
   docker:
     exposedByDefault: false
-    network: stock-analysis_internal
+    network: tutoring-platform_internal
   file:
     directory: /etc/traefik/dynamic
     watch: true

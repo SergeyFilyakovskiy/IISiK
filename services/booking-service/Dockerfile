@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
 COPY services/booking-service/pyproject.toml ./services/booking-service/
 
 RUN mkdir -p packages/shared/src/shared \
@@ -23,6 +24,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/booking-service/src ./services/booking-service/src
 COPY services/booking-service/alembic.ini ./services/booking-service/alembic.ini
 COPY services/booking-service/migrations ./services/booking-service/migrations
@@ -52,9 +54,10 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/booking-service/src:/app/packages/shared/src:/app/packages/proto-generated/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-CMD ["uv", "run", "--package", "booking-service", "uvicorn", "booking_service.main:app", "--host", "0.0.0.0", "--port", "8004"]
+CMD ["uv", "run", "--package", "booking-service", "python", "-m", "booking_service.main"]

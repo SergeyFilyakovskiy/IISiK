@@ -10,6 +10,7 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  redis_cache_data:
   kafka_data:
   prometheus_data:
   grafana_data:
@@ -39,18 +40,27 @@ services:
       dockerfile: services/graphql-api/Dockerfile
     restart: no
     environment:
-      - IDENTITY_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/identity_db
-      - CATALOG_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
-      - SCHEDULING_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/scheduling_db
-      - BOOKING_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
-      - PAYMENT_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db
-      - REVIEW_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/review_db
-      - NOTIFICATION_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db
-      - ANALYTICS_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/analytics_db
+      - AUTH_SERVICE_URL=http://identity-service:8001
+      - IDENTITY_GRPC_ADDRESS=identity-service:50051
+      - CATALOG_GRPC_ADDRESS=catalog-service:50052
+      - SCHEDULING_GRPC_ADDRESS=scheduling-service:50053
+      - BOOKING_GRPC_ADDRESS=booking-service:50054
+      - PAYMENT_GRPC_ADDRESS=payment-service:50055
+      - REVIEW_GRPC_ADDRESS=review-service:50056
+      - NOTIFICATION_GRPC_ADDRESS=notification-service:50057
+      - ANALYTICS_GRPC_ADDRESS=analytics-service:50058
+      - GRPC_TIMEOUT_SECONDS=5
     expose:
       - "4000"
     depends_on:
-      postgres: { condition: service_healthy }
+      identity-service: { condition: service_healthy }
+      catalog-service: { condition: service_started }
+      scheduling-service: { condition: service_started }
+      booking-service: { condition: service_started }
+      payment-service: { condition: service_started }
+      review-service: { condition: service_started }
+      notification-service: { condition: service_started }
+      analytics-service: { condition: service_started }
     networks:
       - internal
     healthcheck:
@@ -102,14 +112,16 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50052
+      - KAFKA_BROKERS=kafka:9092
+      - CACHE_REDIS_URL=redis://redis-cache:6379/0
+      - CACHE_TTL_SECONDS=60
+    expose: ["50052"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+      redis-cache: { condition: service_healthy }
+    networks: [internal]
 
   scheduling-service:
     build:
@@ -118,14 +130,18 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/scheduling_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50053
+      - CATALOG_GRPC_ADDRESS=catalog-service:50052
+      - KAFKA_BROKERS=kafka:9092
+      - CACHE_REDIS_URL=redis://redis-cache:6379/0
+      - CACHE_TTL_SECONDS=30
+    expose: ["50053"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+      redis-cache: { condition: service_healthy }
+      catalog-service: { condition: service_started }
+    networks: [internal]
 
   booking-service:
     build:
@@ -134,14 +150,19 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50054
+      - SCHEDULING_GRPC_ADDRESS=scheduling-service:50053
+      - PAYMENT_GRPC_ADDRESS=payment-service:50055
+      - CATALOG_GRPC_ADDRESS=catalog-service:50052
+      - KAFKA_BROKERS=kafka:9092
+    expose: ["50054"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+      scheduling-service: { condition: service_started }
+      payment-service: { condition: service_started }
+      catalog-service: { condition: service_started }
+    networks: [internal]
 
   payment-service:
     build:
@@ -150,14 +171,13 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50055
+      - KAFKA_BROKERS=kafka:9092
+    expose: ["50055"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+    networks: [internal]
 
   review-service:
     build:
@@ -166,14 +186,15 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/review_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50056
+      - BOOKING_GRPC_ADDRESS=booking-service:50054
+      - KAFKA_BROKERS=kafka:9092
+    expose: ["50056"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+      booking-service: { condition: service_started }
+    networks: [internal]
 
   notification-service:
     build:
@@ -182,14 +203,15 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db
-    expose:
-      - "8000"
+      - GRPC_PORT=50057
+      - IDENTITY_GRPC_ADDRESS=identity-service:50051
+      - KAFKA_BROKERS=kafka:9092
+    expose: ["50057"]
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      identity-service: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    networks: [internal]
 
   analytics-service:
     build:
@@ -198,14 +220,13 @@ services:
     restart: no
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/analytics_db
-    expose:
-      - "50051"
-      - "8000"
+      - GRPC_PORT=50058
+      - KAFKA_BROKERS=kafka:9092
+    expose: ["50058"]
     depends_on:
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
-    networks:
-      - internal
+      kafka: { condition: service_healthy }
+    networks: [internal]
 
   # ── DATABASES & BROKERS ────────────────────────────────────
 
@@ -243,7 +264,7 @@ services:
       redis-server
       --requirepass ${REDIS_PASSWORD}
       --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --appendonly yes
     volumes:
       - redis_data:/data
@@ -251,6 +272,23 @@ services:
       - internal
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-cache:
+    image: redis:7-alpine
+    restart: no
+    command: >
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - redis_cache_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

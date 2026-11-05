@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY packages/shared/pyproject.toml ./packages/shared/
+COPY packages/proto-generated/pyproject.toml ./packages/proto-generated/
 COPY services/analytics-service/pyproject.toml ./services/analytics-service/
 
 RUN mkdir -p packages/shared/src/shared \
@@ -23,6 +24,7 @@ RUN uv sync \
     --no-install-workspace
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/proto-generated/src ./packages/proto-generated/src
 COPY services/analytics-service/src ./services/analytics-service/src
 COPY services/analytics-service/alembic.ini ./services/analytics-service/alembic.ini
 COPY services/analytics-service/migrations ./services/analytics-service/migrations
@@ -52,9 +54,10 @@ RUN chmod +x /docker-entrypoint.sh
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/services/analytics-service/src:/app/packages/shared/src:/app/packages/proto-generated/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-CMD ["uv", "run", "--package", "analytics-service", "uvicorn", "analytics_service.main:app", "--host", "0.0.0.0", "--port", "8008"]
+CMD ["uv", "run", "--package", "analytics-service", "python", "-m", "analytics_service.main"]

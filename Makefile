@@ -26,7 +26,7 @@ test:
 	uv run pytest
 
 run-graphql:
-	PYTHONPATH=services/graphql-api/src:services/identity-service/src:services/catalog-service/src:services/scheduling-service/src:services/booking-service/src:services/payment-service/src:services/review-service/src:services/notification-service/src:services/analytics-service/src:packages/shared/src \
+	PYTHONPATH=services/graphql-api/src:packages/shared/src:packages/proto-generated/src \
 		uv run --package graphql-api uvicorn graphql_api.main:app --reload --port 4000
 
 run-identity:
@@ -34,16 +34,22 @@ run-identity:
 		uv run --package identity-service uvicorn identity_service.main:app --reload --port 8001
 
 run-catalog:
-	uv run --package catalog-service uvicorn catalog_service.main:app --reload --port 8002
+	uv run --package catalog-service python -m catalog_service.main
 
 run-scheduling:
-	uv run --package scheduling-service uvicorn scheduling_service.main:app --reload --port 8003
+	uv run --package scheduling-service python -m scheduling_service.main
 
 run-booking:
-	uv run --package booking-service uvicorn booking_service.main:app --reload --port 8004
+	uv run --package booking-service python -m booking_service.main
 
 run-payment:
-	uv run --package payment-service uvicorn payment_service.main:app --reload --port 8005
+	uv run --package payment-service python -m payment_service.main
 
 run-review:
-	uv run --package review-service uvicorn review_service.main:app --reload --port 8006
+	uv run --package review-service python -m review_service.main
+
+run-notification:
+	uv run --package notification-service python -m notification_service.main
+
+run-analytics:
+	uv run --package analytics-service python -m analytics_service.main

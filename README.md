@@ -399,15 +399,17 @@ Identity Service уже предоставляет HTTP API на порту `800
 - `GET /api/v1/users/me` — текущий пользователь по Bearer access;
 - `GET /health` — проверка PostgreSQL и Redis.
 
-Access JWT действует 5 минут. Refresh JWT хранится в Redis 30 дней и заменяется при каждом refresh, поэтому старый refresh нельзя использовать повторно. Logout помещает `jti` access в Redis blacklist на оставшийся срок жизни. gRPC-контракт `identity.v1.IdentityService` содержит операции Register, Login, Refresh, Logout, GetUser и ValidateToken; защищённые вызовы используют metadata `authorization: Bearer <access>`.
+Access JWT действует 5 минут. Access и refresh связаны общим `sid`; активная сессия и refresh-запись хранятся в Redis с TTL. Каждый защищённый запрос требует и валидный JWT, и активную сессию. Refresh заменяет токены и отзывает прежний access, logout удаляет сессию и refresh. gRPC-контракт `identity.v1.IdentityService` также содержит внутренние операции чтения пользователей/профилей и обновления профиля ученика.
 
 ### GraphQL API
 
 GraphQL API доступен на `POST /graphql` (порт `4000`) и реализует Query для получения пользователей, профилей преподавателей, предметов, расписания, занятий, записей, платежей, отзывов, уведомлений и аналитики. Поддерживаются получение по ID, списки, фильтры, сортировка, пагинация и связанные данные (`TeacherProfile → User`, `Lesson → Teacher/Subject`, `Booking → Lesson/Payment`). Query `adminAnalytics` возвращает агрегированные показатели платформы и преподавателей за период.
 
-По требованиям ЛР4 добавлены Mutation для регистрации и аутентификации, управления профилем преподавателя и предметами, расписания, публикации и переноса занятий, записи, оплаты, отмены, завершения занятия и отзыва. Resolver только преобразует GraphQL-данные и вызывает BFF; бизнес-проверки и изменения состояния выполняют application services. Сквозные сценарии используют резервирование занятия, компенсации при ошибках, уведомления и идемпотентную запись аналитики.
+Mutation покрывают регистрацию и аутентификацию, управление профилем преподавателя и предметами, расписание, публикацию и перенос занятий, запись, оплату, отмену, завершение занятия и отзыв. Публичны регистрация, вход, refresh и безопасные чтения каталога; остальные операции требуют Bearer JWT и активную сессию. Персональные Query/Mutation используют principal из Auth Service, а не идентификаторы владельца от клиента. Роли и владение дополнительно проверяются в сервисах.
 
-GraphQL по-прежнему использует mock-шлюзы вместо сетевых gRPC-вызовов. Шлюзы обращаются только к публичным application services соответствующих доменов; каждый service/repository-слой работает исключительно со своей БД. Kafka в этот этап не входит.
+GraphQL использует REST client для Identity и реальные gRPC clients для остальных сервисов, не открывает их БД и не содержит распределённую оркестрацию. Booking владеет сценариями записи, оплаты, отмены и завершения с компенсациями; Review проверяет завершённую запись через Booking. События Kafka обновляют уведомления, аналитику и рейтинг.
+
+Все сетевые вызовы имеют timeout; безопасные чтения и идемпотентные переходы используют ограниченные retry с backoff. Kafka consumers применяют ручной commit, идемпотентность по `event_id`, ограниченные попытки и DLQ. JSON-логи и Kafka/gRPC/REST-вызовы связываются через correlation ID. Catalog и Scheduling используют отдельный Redis cache с TTL и version-based invalidation; Auth Redis имеет политику `noeviction`.
 
 ---
 
@@ -444,18 +446,16 @@ uv sync --all-packages
 ### Запуск сервисов локально (без Docker)
 
 ```bash
-# каждый сервис в отдельном терминале
-PYTHONPATH=services/identity-service/src:packages/shared/src:packages/proto-generated/src \
-  uv run --package identity-service uvicorn identity_service.main:app --reload --port 8001
-uv run --package catalog-service uvicorn catalog_service.main:app --reload --port 8002
-uv run --package scheduling-service uvicorn scheduling_service.main:app --reload --port 8003
-uv run --package booking-service uvicorn booking_service.main:app --reload --port 8004
-uv run --package payment-service uvicorn payment_service.main:app --reload --port 8005
-uv run --package review-service uvicorn review_service.main:app --reload --port 8006
-uv run --package notification-service python -m notification_service.consumer
-uv run --package analytics-service analytics-service
-PYTHONPATH=services/graphql-api/src:services/identity-service/src:services/catalog-service/src:services/scheduling-service/src:services/booking-service/src:services/payment-service/src:services/review-service/src:services/notification-service/src:services/analytics-service/src:packages/shared/src \
-  uv run --package graphql-api uvicorn graphql_api.main:app --reload --port 4000
+# каждый сервис в отдельном терминале; необходимы DATABASE_URL и адреса зависимостей
+make run-identity
+make run-catalog
+make run-scheduling
+make run-booking
+make run-payment
+make run-review
+make run-notification
+make run-analytics
+make run-graphql
 ```
 
 ### Работа с Docker
@@ -589,7 +589,7 @@ query {
 
 ```graphql
 mutation {
-  bookLesson(input: { lessonId: "uuid-lesson", userId: "uuid-user" }) {
+  bookLesson(input: { lessonId: "uuid-lesson" }) {
     id
     status
     price
@@ -626,17 +626,18 @@ kafka:9092
 
 | Топик | Назначение |
 |---|---|
-| `identity.user.registered` | Пользователь зарегистрирован |
-| `catalog.teacher.updated` | Профиль преподавателя обновлён |
 | `scheduling.lesson.created` | Занятие создано |
+| `scheduling.lesson.cancelled` | Занятие отменено |
 | `scheduling.lesson.completed` | Занятие завершено |
 | `booking.created` | Запись создана |
 | `booking.confirmed` | Запись подтверждена |
 | `booking.cancelled` | Запись отменена |
+| `booking.completed` | Запись завершена |
 | `payment.completed` | Оплата выполнена |
 | `payment.failed` | Ошибка оплаты |
-| `review.created` | Отзыв добавлен |
-| `review.rating.updated` | Рейтинг обновлён |
+| `payment.refunded` | Возврат выполнен |
+| `review.created` | Отзыв добавлен, рейтинг и аналитика обновляются |
+| `notification.dlq`, `analytics.dlq`, `catalog.dlq` | Необработанные сообщения |
 
 ---
 
